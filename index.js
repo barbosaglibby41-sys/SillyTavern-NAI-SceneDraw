@@ -614,12 +614,18 @@
                 yKey,
                 dx: ev.clientX - rect.left,
                 dy: ev.clientY - rect.top,
+                startX: ev.clientX,
+                startY: ev.clientY,
+                moved: false,
             };
             handle.setPointerCapture(ev.pointerId);
             ev.preventDefault();
         });
         handle.addEventListener('pointermove', (ev) => {
             if (!dragState || dragState.target !== target) return;
+            if (Math.abs(ev.clientX - dragState.startX) + Math.abs(ev.clientY - dragState.startY) > 4) {
+                dragState.moved = true;
+            }
             const x = ev.clientX - dragState.dx;
             const y = ev.clientY - dragState.dy;
             target.style.left = `${x}px`;
@@ -745,7 +751,10 @@
         enableDrag(head, panel, 'panelX', 'panelY');
 
         launcher?.addEventListener('click', (ev) => {
-            if (dragState) return;
+            if (launcher.dataset.nsdDragged === '1') {
+                launcher.dataset.nsdDragged = '0';
+                return;
+            }
             const s = getSettings();
             if (s.panelOpen) hidePanel();
             else openPanel();
@@ -887,10 +896,6 @@
         } catch (err) {
             console.error(`[${MODULE}] init failed`, err);
             toast('error', 'NAI 情景生图加载失败：' + (err.message || err));
-        }
-    });
-})();
-.message || err));
         }
     });
 })();
