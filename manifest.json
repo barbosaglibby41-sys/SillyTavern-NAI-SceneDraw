@@ -1,0 +1,13 @@
+{
+    "display_name": "NAI 情景生图（锁外貌）",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "barbosaglibby41-sys",
+    "version": "1.0.0",
+    "homePage": "https://github.com/barbosaglibby41-sys/SillyTavern-NAI-SceneDraw",
+    "auto_update": true,
+    "minimum_client_version": "1.12.0"
+}

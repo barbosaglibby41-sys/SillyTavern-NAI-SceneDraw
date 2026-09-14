@@ -1,0 +1,82 @@
+<div id="nai_scene_draw_settings" class="nai-scene-draw-settings">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <b>NAI 情景生图（锁外貌）</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        <div class="inline-drawer-content">
+            <p class="nsd-help">
+                扮演模型不要写英文 tag。外貌只改「身份证」。表情 / 足 / 洞只跟最近正文走。
+            </p>
+
+            <div class="nsd-field">
+                <label for="nsd_token">NovelAI API Token</label>
+                <input id="nsd_token" class="text_pole" type="password" autocomplete="off" placeholder="Persistent API Token，不要发到聊天里" />
+            </div>
+
+            <div class="nsd-field">
+                <label for="nsd_api_base">直连 API 地址</label>
+                <input id="nsd_api_base" class="text_pole" type="text" placeholder="https://image.novelai.net" />
+                <small>官方地址跨域失败时，改成兼容 <code>/ai/generate-image</code> 的反代，不要带末尾斜杠。</small>
+            </div>
+
+            <label class="checkbox_label" for="nsd_use_proxy">
+                <input id="nsd_use_proxy" type="checkbox" />
+                走酒馆服务端插件代理（推荐，可避开浏览器 CORS）
+            </label>
+            <small class="nsd-help">需要把仓库里的 <code>server-plugin</code> 拷到酒馆 <code>plugins/nai-scene-draw</code>，并在 <code>config.yaml</code> 打开 <code>enableServerPlugins: true</code>。</small>
+
+            <div class="nsd-field">
+                <label for="nsd_model">模型</label>
+                <select id="nsd_model" class="text_pole">
+                    <option value="nai-diffusion-4-5-full">NAI 4.5 Full（更稳，优先用来定人）</option>
+                    <option value="nai-diffusion-5-full">NAI 5 Full（理解更好，锁脸未必更强）</option>
+                    <option value="nai-diffusion-4-5-curated">NAI 4.5 Curated</option>
+                    <option value="nai-diffusion-5-curated">NAI 5 Curated</option>
+                </select>
+            </div>
+
+            <div class="nsd-row">
+                <label>宽 <input id="nsd_width" class="text_pole" type="number" min="64" step="64" /></label>
+                <label>高 <input id="nsd_height" class="text_pole" type="number" min="64" step="64" /></label>
+            </div>
+            <div class="nsd-row">
+                <label>步数 <input id="nsd_steps" class="text_pole" type="number" min="1" max="50" /></label>
+                <label>引导 <input id="nsd_scale" class="text_pole" type="number" min="1" max="20" step="0.1" /></label>
+            </div>
+
+            <div class="nsd-field">
+                <label for="nsd_prefix">画风前缀（每张都有）</label>
+                <textarea id="nsd_prefix" class="text_pole" rows="2"></textarea>
+            </div>
+
+            <div class="nsd-field">
+                <label for="nsd_identity">当前角色身份证（每张都有，禁止写表情 / 洞 / 脱鞋）</label>
+                <textarea id="nsd_identity" class="text_pole" rows="4" placeholder="1girl, milf, mature female, huge breasts, wide hips, thick thighs, wedding ring, long hair, brown hair, brown eyes"></textarea>
+                <small>按角色卡分别记住，也会写入角色卡扩展字段。换卡会自动换身份证。</small>
+            </div>
+
+            <div class="nsd-field">
+                <label for="nsd_negative">负向</label>
+                <textarea id="nsd_negative" class="text_pole" rows="3"></textarea>
+            </div>
+
+            <label class="checkbox_label" for="nsd_use_llm">
+                <input id="nsd_use_llm" type="checkbox" />
+                用当前聊天模型翻译「情景」（仍禁止它改外貌；失败则退回词典）
+            </label>
+            <label class="checkbox_label" for="nsd_auto">
+                <input id="nsd_auto" type="checkbox" />
+                角色回复后自动出图（默认关，容易烧额度和画错表情）
+            </label>
+
+            <div class="nsd-buttons">
+                <button id="nsd_btn_preview" class="menu_button" type="button">预览提示词</button>
+                <button id="nsd_btn_gen" class="menu_button" type="button">按最近剧情出图</button>
+                <button id="nsd_btn_test" class="menu_button" type="button">测试连接</button>
+            </div>
+            <pre id="nsd_preview" class="nsd-preview"></pre>
+            <p class="nsd-help">聊天里也可输入 <code>/nimg</code> 出图，<code>/nimg dry</code> 只预览，<code>/nimg freeze 标签</code> 写入身份证。</p>
+        </div>
+    </div>
+</div>
