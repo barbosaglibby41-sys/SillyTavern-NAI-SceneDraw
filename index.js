@@ -10,6 +10,7 @@
     const DEFAULT_API = 'https://image.novelai.net';
     const PROXY_PATH = '/api/plugins/nai-scene-draw/generate';
     const PROXY_PING = '/api/plugins/nai-scene-draw/ping';
+    const FOLDER = 'third-party/SillyTavern-NAI-SceneDraw';
 
     const DEFAULTS = Object.freeze({
         apiToken: '',
@@ -25,9 +26,15 @@
         useLlmScene: false,
         autoGenerate: false,
         identities: {},
+        showFloat: true,
+        panelOpen: false,
+        panelMin: false,
+        panelX: null,
+        panelY: null,
+        launcherX: null,
+        launcherY: null,
     });
 
-    /** 情景词典：整行开关，禁止模型发明 */
     const LEXICON = [
         {
             id: 'ahegao',
@@ -67,6 +74,7 @@
 `;
 
     let generating = false;
+    let dragState = null;
 
     function ctx() {
         return (window.SillyTavern && SillyTavern.getContext && SillyTavern.getContext()) || {};
@@ -89,7 +97,9 @@
         const s = bag[MODULE];
         for (const key of Object.keys(DEFAULTS)) {
             if (!Object.prototype.hasOwnProperty.call(s, key)) {
-                s[key] = structuredClone ? structuredClone(DEFAULTS[key]) : JSON.parse(JSON.stringify(DEFAULTS[key]));
+                s[key] = typeof structuredClone === 'function'
+                    ? structuredClone(DEFAULTS[key])
+                    : JSON.parse(JSON.stringify(DEFAULTS[key]));
             }
         }
         if (!s.identities || typeof s.identities !== 'object') s.identities = {};
@@ -108,6 +118,13 @@
         return ch?.avatar || ch?.name || 'default';
     }
 
+    function charDisplayName() {
+        const c = ctx();
+        const id = c.characterId;
+        const ch = (id !== undefined && id !== null && c.characters) ? c.characters[id] : null;
+        return ch?.name || c.name2 || '未选择角色';
+    }
+
     function readCardIdentity() {
         const c = ctx();
         const id = c.characterId;
@@ -119,8 +136,7 @@
     function getIdentity() {
         const card = readCardIdentity();
         if (card) return card;
-        const s = getSettings();
-        return String(s.identities[charKey()] || '').trim();
+        return String(getSettings().identities[charKey()] || '').trim();
     }
 
     async function setIdentity(text) {
@@ -136,6 +152,7 @@
                 console.warn(`[${MODULE}] writeExtensionField failed`, err);
             }
         }
+        updateFloatStatus();
     }
 
     function stripHtml(html) {
@@ -404,15 +421,36 @@
         return buildPrompt(rows, extra);
     }
 
-    function previewToBox(built) {
-        const el = document.getElementById('nsd_preview');
-        if (!el) return;
-        el.textContent =
-            `【身份证】\n${built.identity || '（空：先填当前角色身份证，否则每张都会换人）'}\n\n` +
+    function previewText(built) {
+        return `【身份证】\n${built.identity || '（空：先填当前角色身份证，否则每张都会换人）'}\n\n` +
             `【本轮情景】\n${built.scene || '（正文没勾中足/洞/阿嘿颜，只会画正常脸）'}\n\n` +
             `【base】\n${built.base}\n\n` +
             `【character】\n${built.charPrompt}\n\n` +
             `【negative】\n${built.negative}`;
+    }
+
+    function previewToBox(built) {
+        const text = previewText(built);
+        const el = document.getElementById('nsd_preview');
+        if (el) el.textContent = text;
+        const fel = document.getElementById('nsd_f_preview_box');
+        if (fel) fel.textContent = text;
+        updateChips(built.rows || []);
+        updateFloatStatus();
+    }
+
+    function setBusy(on) {
+        ['nsd_f_gen', 'nsd_f_preview', 'nsd_btn_gen', 'nsd_btn_preview'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.disabled = !!on;
+        });
+        const bar = document.getElementById('nsd_f_progress');
+        if (bar) bar.hidden = !on;
+        const dot = document.getElementById('nsd_launcher_dot');
+        if (dot) {
+            dot.classList.toggle('is-busy', !!on);
+            if (!on) updateFloatStatus();
+        }
     }
 
     async function generateNow(dry = false) {
@@ -427,6 +465,7 @@
             return 'preview';
         }
         generating = true;
+        setBusy(true);
         try {
             toast('info', '正在向 NAI 出图…');
             const dataUrl = await callNai(built);
@@ -435,6 +474,7 @@
             return 'ok';
         } finally {
             generating = false;
+            setBusy(false);
         }
     }
 
@@ -462,8 +502,173 @@
     }
 
     function reloadIdentityField() {
+        const value = getIdentity();
         const idEl = document.getElementById('nsd_identity');
-        if (idEl) idEl.value = getIdentity();
+        if (idEl && document.activeElement !== idEl) idEl.value = value;
+        const fEl = document.getElementById('nsd_f_identity');
+        if (fEl && document.activeElement !== fEl) fEl.value = value;
+        const model = getSettings().model;
+        const m1 = document.getElementById('nsd_model');
+        const m2 = document.getElementById('nsd_f_model');
+        if (m1 && document.activeElement !== m1) m1.value = model;
+        if (m2 && document.activeElement !== m2) m2.value = model;
+        updateFloatStatus();
+        refreshSceneChips();
+    }
+
+    function updateChips(rows) {
+        const ids = new Set((rows || []).map(r => r.id));
+        document.querySelectorAll('#nsd_chips [data-nsd-chip]').forEach(el => {
+            el.classList.toggle('is-on', ids.has(el.getAttribute('data-nsd-chip')));
+        });
+        const hint = document.getElementById('nsd_chip_hint');
+        if (hint) {
+            hint.textContent = ids.size
+                ? '已按最近正文点亮，出图时会带上这些标签。'
+                : '日常对话不会点亮。写到了才会加标签。';
+        }
+    }
+
+    function refreshSceneChips() {
+        try {
+            updateChips(matchLexicon(recentText(2)));
+        } catch (_) { /* ignore */ }
+    }
+
+    function updateFloatStatus() {
+        const s = getSettings();
+        const idOk = Boolean(getIdentity());
+        const idState = document.getElementById('nsd_f_id_state');
+        if (idState) {
+            idState.textContent = idOk ? '身份证已锁' : '身份证未填';
+            idState.classList.toggle('nsd-pill-ok', idOk);
+            idState.classList.toggle('nsd-pill-warn', !idOk);
+        }
+        const proxy = document.getElementById('nsd_f_proxy_state');
+        if (proxy) proxy.textContent = s.useProxy ? '代理' : '直连';
+        const model = document.getElementById('nsd_f_model_state');
+        if (model) {
+            const map = {
+                'nai-diffusion-4-5-full': '4.5 Full',
+                'nai-diffusion-5-full': '5 Full',
+                'nai-diffusion-4-5-curated': '4.5 Curated',
+                'nai-diffusion-5-curated': '5 Curated',
+            };
+            model.textContent = map[s.model] || s.model;
+        }
+        const char = document.getElementById('nsd_f_char');
+        if (char) char.textContent = charDisplayName();
+        const dot = document.getElementById('nsd_launcher_dot');
+        if (dot && !generating) {
+            dot.classList.toggle('is-ok', idOk && Boolean(s.apiToken));
+            dot.classList.remove('is-busy');
+        }
+        const launcher = document.getElementById('nsd_launcher');
+        const panel = document.getElementById('nsd_panel');
+        if (s.showFloat === false) {
+            if (launcher) launcher.style.display = 'none';
+            if (panel) panel.hidden = true;
+        } else if (launcher) {
+            launcher.style.display = '';
+        }
+    }
+
+    function clamp(n, min, max) {
+        return Math.max(min, Math.min(max, n));
+    }
+
+    function applyPanelPos() {
+        const s = getSettings();
+        const panel = document.getElementById('nsd_panel');
+        if (!panel) return;
+        const x = s.panelX == null ? window.innerWidth - 384 : Number(s.panelX);
+        const y = s.panelY == null ? 72 : Number(s.panelY);
+        panel.style.left = `${clamp(x, 8, Math.max(8, window.innerWidth - 80))}px`;
+        panel.style.top = `${clamp(y, 8, Math.max(8, window.innerHeight - 48))}px`;
+        panel.style.right = 'auto';
+        panel.style.bottom = 'auto';
+        panel.classList.toggle('is-min', !!s.panelMin);
+        panel.hidden = !s.panelOpen;
+    }
+
+    function applyLauncherPos() {
+        const s = getSettings();
+        const launcher = document.getElementById('nsd_launcher');
+        if (!launcher) return;
+        if (s.launcherX == null || s.launcherY == null) return;
+        launcher.style.left = `${clamp(Number(s.launcherX), 8, window.innerWidth - 56)}px`;
+        launcher.style.top = `${clamp(Number(s.launcherY), 8, window.innerHeight - 56)}px`;
+        launcher.style.right = 'auto';
+        launcher.style.bottom = 'auto';
+    }
+
+    function enableDrag(handle, target, xKey, yKey) {
+        if (!handle || !target) return;
+        handle.addEventListener('pointerdown', (ev) => {
+            if (ev.button !== 0) return;
+            if (ev.target.closest('button, input, textarea, select, a')) return;
+            const rect = target.getBoundingClientRect();
+            dragState = {
+                target,
+                xKey,
+                yKey,
+                dx: ev.clientX - rect.left,
+                dy: ev.clientY - rect.top,
+            };
+            handle.setPointerCapture(ev.pointerId);
+            ev.preventDefault();
+        });
+        handle.addEventListener('pointermove', (ev) => {
+            if (!dragState || dragState.target !== target) return;
+            const x = ev.clientX - dragState.dx;
+            const y = ev.clientY - dragState.dy;
+            target.style.left = `${x}px`;
+            target.style.top = `${y}px`;
+            target.style.right = 'auto';
+            target.style.bottom = 'auto';
+        });
+        const end = (ev) => {
+            if (!dragState || dragState.target !== target) return;
+            const rect = target.getBoundingClientRect();
+            const s = getSettings();
+            s[xKey] = Math.round(rect.left);
+            s[yKey] = Math.round(rect.top);
+            saveSettings();
+            if (dragState.moved) target.dataset.nsdDragged = '1';
+            dragState = null;
+            try { handle.releasePointerCapture(ev.pointerId); } catch (_) { /* ignore */ }
+        };
+        handle.addEventListener('pointerup', end);
+        handle.addEventListener('pointercancel', end);
+    }
+
+    function openPanel() {
+        const s = getSettings();
+        s.panelOpen = true;
+        s.panelMin = false;
+        saveSettings();
+        applyPanelPos();
+        reloadIdentityField();
+        refreshSceneChips();
+    }
+
+    function hidePanel() {
+        const s = getSettings();
+        s.panelOpen = false;
+        saveSettings();
+        applyPanelPos();
+    }
+
+    async function loadTemplate(name) {
+        const c = ctx();
+        try {
+            if (typeof c.renderExtensionTemplateAsync === 'function') {
+                return await c.renderExtensionTemplateAsync(FOLDER, name);
+            }
+        } catch (err) {
+            console.warn(`[${MODULE}] renderExtensionTemplateAsync ${name}`, err);
+        }
+        return await $.get(`/scripts/extensions/${FOLDER}/${name}.html`);
     }
 
     function bindSettings() {
@@ -479,6 +684,16 @@
         bindCheckbox('nsd_use_proxy', 'useProxy');
         bindCheckbox('nsd_use_llm', 'useLlmScene');
         bindCheckbox('nsd_auto', 'autoGenerate');
+        bindCheckbox('nsd_show_float', 'showFloat');
+
+        document.getElementById('nsd_show_float')?.addEventListener('change', updateFloatStatus);
+        document.getElementById('nsd_use_proxy')?.addEventListener('change', updateFloatStatus);
+        document.getElementById('nsd_model')?.addEventListener('change', () => {
+            const m2 = document.getElementById('nsd_f_model');
+            if (m2) m2.value = getSettings().model;
+            updateFloatStatus();
+        });
+        document.getElementById('nsd_token')?.addEventListener('change', updateFloatStatus);
 
         const idEl = document.getElementById('nsd_identity');
         if (idEl) {
@@ -486,6 +701,10 @@
             const persist = () => setIdentity(idEl.value);
             idEl.addEventListener('change', persist);
             idEl.addEventListener('blur', persist);
+            idEl.addEventListener('input', () => {
+                const fEl = document.getElementById('nsd_f_identity');
+                if (fEl && document.activeElement !== fEl) fEl.value = idEl.value;
+            });
         }
 
         document.getElementById('nsd_btn_preview')?.addEventListener('click', () => {
@@ -512,18 +731,69 @@
         });
     }
 
-    async function loadSettingsHtml() {
-        const c = ctx();
-        const folder = 'third-party/SillyTavern-NAI-SceneDraw';
-        try {
-            if (typeof c.renderExtensionTemplateAsync === 'function') {
-                return await c.renderExtensionTemplateAsync(folder, 'settings');
-            }
-        } catch (err) {
-            console.warn(`[${MODULE}] renderExtensionTemplateAsync failed`, err);
+    async function mountFloat() {
+        if (document.getElementById('nsd_float_root')) return;
+        const html = await loadTemplate('float');
+        document.body.insertAdjacentHTML('beforeend', html);
+
+        const launcher = document.getElementById('nsd_launcher');
+        const panel = document.getElementById('nsd_panel');
+        const head = document.getElementById('nsd_panel_head');
+        applyLauncherPos();
+        applyPanelPos();
+        enableDrag(launcher, launcher, 'launcherX', 'launcherY');
+        enableDrag(head, panel, 'panelX', 'panelY');
+
+        launcher?.addEventListener('click', (ev) => {
+            if (dragState) return;
+            const s = getSettings();
+            if (s.panelOpen) hidePanel();
+            else openPanel();
+            ev.preventDefault();
+        });
+        document.getElementById('nsd_btn_hide')?.addEventListener('click', hidePanel);
+        document.getElementById('nsd_btn_min')?.addEventListener('click', () => {
+            const s = getSettings();
+            s.panelMin = !s.panelMin;
+            saveSettings();
+            applyPanelPos();
+        });
+
+        const fId = document.getElementById('nsd_f_identity');
+        if (fId) {
+            fId.value = getIdentity();
+            const persist = () => {
+                setIdentity(fId.value);
+                const idEl = document.getElementById('nsd_identity');
+                if (idEl) idEl.value = fId.value;
+            };
+            fId.addEventListener('change', persist);
+            fId.addEventListener('blur', persist);
         }
-        const url = `/scripts/extensions/${folder}/settings.html`;
-        return await $.get(url);
+
+        const fModel = document.getElementById('nsd_f_model');
+        if (fModel) {
+            fModel.value = getSettings().model;
+            fModel.addEventListener('change', () => {
+                getSettings().model = fModel.value;
+                saveSettings();
+                const m1 = document.getElementById('nsd_model');
+                if (m1) m1.value = fModel.value;
+                updateFloatStatus();
+            });
+        }
+
+        document.getElementById('nsd_f_preview')?.addEventListener('click', () => {
+            generateNow(true).catch(e => toast('error', e.message || String(e)));
+        });
+        document.getElementById('nsd_f_gen')?.addEventListener('click', () => {
+            generateNow(false).catch(e => toast('error', e.message || String(e)));
+        });
+
+        window.addEventListener('resize', () => {
+            applyPanelPos();
+            applyLauncherPos();
+        });
     }
 
     async function registerSlash() {
@@ -534,6 +804,10 @@
                 await setIdentity(v.slice(7));
                 reloadIdentityField();
                 return '身份证已更新';
+            }
+            if (v === 'ui' || v === '面板') {
+                openPanel();
+                return 'opened';
             }
             if (v === 'dry' || v === '预览') {
                 await generateNow(true);
@@ -553,7 +827,7 @@
                 callback,
                 unnamedArgumentList: [
                     argMod.SlashCommandArgument.fromProps({
-                        description: '空=出图；dry=预览；freeze 标签=写入当前角色身份证',
+                        description: '空=出图；dry=预览；ui=打开面板；freeze 标签=写入身份证',
                         typeList: [argMod.ARGUMENT_TYPE.STRING],
                         isRequired: false,
                     }),
@@ -577,10 +851,13 @@
         const types = c.eventTypes || c.event_types || {};
         if (!src || typeof src.on !== 'function') return;
 
-        if (types.CHAT_CHANGED) src.on(types.CHAT_CHANGED, reloadIdentityField);
+        if (types.CHAT_CHANGED) src.on(types.CHAT_CHANGED, () => { reloadIdentityField(); refreshSceneChips(); });
         if (types.CHARACTER_EDITED) src.on(types.CHARACTER_EDITED, reloadIdentityField);
+        if (types.MESSAGE_RECEIVED) src.on(types.MESSAGE_RECEIVED, refreshSceneChips);
+        if (types.MESSAGE_SENT) src.on(types.MESSAGE_SENT, refreshSceneChips);
+        if (types.CHARACTER_MESSAGE_RENDERED) src.on(types.CHARACTER_MESSAGE_RENDERED, refreshSceneChips);
 
-        const received = types.MESSAGE_RECEIVED || types.CHARACTER_MESSAGE_RENDERED;
+        const received = types.MESSAGE_RECEIVED;
         if (received) {
             src.on(received, async (idx) => {
                 if (!getSettings().autoGenerate) return;
@@ -597,16 +874,23 @@
 
     jQuery(async () => {
         try {
-            const html = await loadSettingsHtml();
+            const html = await loadTemplate('settings');
             const $host = $('#extensions_settings2').length ? $('#extensions_settings2') : $('#extensions_settings');
             $host.append(html);
             bindSettings();
+            await mountFloat();
             hookEvents();
             await registerSlash();
+            updateFloatStatus();
+            refreshSceneChips();
             console.log(`[${MODULE}] loaded`);
         } catch (err) {
             console.error(`[${MODULE}] init failed`, err);
             toast('error', 'NAI 情景生图加载失败：' + (err.message || err));
+        }
+    });
+})();
+.message || err));
         }
     });
 })();

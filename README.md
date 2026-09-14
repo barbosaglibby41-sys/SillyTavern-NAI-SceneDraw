@@ -62,6 +62,7 @@ enableServerPlugins: true
 | `/nimg` | 按最近 1～2 条正文出图 |
 | `/nimg dry` | 只预览，不花额度 |
 | `/nimg freeze 1girl, milf, ...` | 写入当前角色身份证 |
+| `/nimg ui` | 打开悬浮窗 |
 
 ## 设置说明
 
@@ -82,5 +83,8 @@ enableServerPlugins: true
 
 - `manifest.json` / `index.js` / `settings.html` / `style.css` — 酒馆 UI 扩展
 - `server-plugin/index.js` — 可选 Node 代理（需单独拷到 `plugins/`）
+
+MIT
+�独拷到 `plugins/`）
 
 MIT

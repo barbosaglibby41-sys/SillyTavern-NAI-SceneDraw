@@ -1,3 +1,4 @@
+/* ===== 扩展设置抽屉 ===== */
 .nai-scene-draw-settings .nsd-help {
     opacity: 0.85;
     margin: 0.4em 0 0.8em;
@@ -29,18 +30,316 @@
     margin: 0.75em 0;
 }
 
-.nai-scene-draw-settings .nsd-preview {
+.nai-scene-draw-settings .nsd-preview,
+.nsd-preview {
     white-space: pre-wrap;
     max-height: 14em;
     overflow: auto;
-    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #111) 80%, #000);
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #16161c) 82%, #000);
     padding: 0.6em;
-    border-radius: 6px;
-    font-size: 0.85em;
+    border-radius: 8px;
+    font-size: 0.82em;
+    line-height: 1.45;
 }
 
 .nai-scene-draw-settings small {
     display: block;
     opacity: 0.75;
     margin-top: 0.2em;
+}
+
+/* ===== 悬浮启动钮 ===== */
+#nsd_float_root {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+#nsd_float_root > * {
+    pointer-events: auto;
+}
+
+.nsd-launcher {
+    position: fixed;
+    right: 18px;
+    bottom: 92px;
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #1c1c24) 88%, #000);
+    color: var(--SmartThemeEmColor, #f3d5c0);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(12px);
+}
+
+.nsd-launcher:hover {
+    transform: translateY(-1px);
+}
+
+.nsd-launcher-mark {
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    font-size: 14px;
+}
+
+.nsd-launcher-dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #c45c5c;
+}
+
+.nsd-launcher-dot.is-ok {
+    background: #6cbc7a;
+}
+
+.nsd-launcher-dot.is-busy {
+    background: #d6b25a;
+    animation: nsd-pulse 1s infinite;
+}
+
+/* ===== 悬浮窗 ===== */
+.nsd-panel {
+    position: fixed;
+    width: min(360px, calc(100vw - 24px));
+    max-height: min(78vh, 720px);
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #14141a) 92%, #000);
+    color: var(--SmartThemeBodyColor, #eee);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(16px);
+    overflow: hidden;
+}
+
+.nsd-panel[hidden] {
+    display: none !important;
+}
+
+.nsd-panel.is-min .nsd-panel-body {
+    display: none;
+}
+
+.nsd-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    cursor: grab;
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #c9a27a) 12%, transparent);
+    user-select: none;
+}
+
+.nsd-panel-head:active {
+    cursor: grabbing;
+}
+
+.nsd-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.nsd-panel-title small {
+    display: block;
+    opacity: 0.7;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 220px;
+}
+
+.nsd-logo {
+    width: 28px;
+    height: 28px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    font-size: 10px;
+    font-weight: 800;
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #c9a27a) 28%, #000);
+}
+
+.nsd-panel-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.nsd-icon-btn {
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.8;
+}
+
+.nsd-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.nsd-panel-body {
+    padding: 12px;
+    overflow: auto;
+}
+
+.nsd-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.nsd-pill {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
+    opacity: 0.9;
+}
+
+.nsd-pill-warn {
+    color: #e8b4b4;
+    border-color: color-mix(in srgb, #e8b4b4 45%, transparent);
+}
+
+.nsd-pill-ok {
+    color: #b6e3be;
+    border-color: color-mix(in srgb, #b6e3be 45%, transparent);
+}
+
+.nsd-label {
+    font-size: 12px;
+    opacity: 0.75;
+    margin: 4px 0 6px;
+}
+
+.nsd-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.nsd-chip {
+    font-size: 12px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
+    opacity: 0.45;
+}
+
+.nsd-chip.is-on {
+    opacity: 1;
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #c9a27a) 22%, transparent);
+    border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #c9a27a) 55%, transparent);
+}
+
+.nsd-hint {
+    margin: 6px 0 10px;
+    font-size: 11px;
+    opacity: 0.65;
+}
+
+.nsd-id-box {
+    width: 100%;
+    resize: vertical;
+    min-height: 4.2em;
+}
+
+.nsd-compact {
+    display: flex;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.nsd-compact label {
+    flex: 1;
+    font-size: 12px;
+}
+
+.nsd-actions {
+    display: grid;
+    grid-template-columns: 1fr 1.4fr;
+    gap: 8px;
+    margin: 10px 0 8px;
+}
+
+.nsd-btn {
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
+    border-radius: 10px;
+    padding: 8px 10px;
+    cursor: pointer;
+    color: inherit;
+    background: transparent;
+}
+
+.nsd-btn-primary {
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #c9a27a) 28%, transparent);
+    font-weight: 650;
+}
+
+.nsd-btn:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+.nsd-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    opacity: 0.85;
+    margin-bottom: 8px;
+}
+
+.nsd-spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-top-color: var(--SmartThemeQuoteColor, #c9a27a);
+    border-radius: 50%;
+    animation: nsd-spin 0.8s linear infinite;
+}
+
+.nsd-details {
+    margin-top: 4px;
+}
+
+.nsd-details summary {
+    cursor: pointer;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+@keyframes nsd-spin {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes nsd-pulse {
+    50% { opacity: 0.35; }
+}
+
+@media (max-width: 600px) {
+    .nsd-launcher {
+        right: 12px;
+        bottom: 76px;
+    }
+    .nsd-panel {
+        width: calc(100vw - 16px);
+    }
 }
