@@ -32,6 +32,10 @@
         ucPreset: 0,
         sizePreset: '832x1216',
         suffix: '',
+        artist: '',
+        schemes: [],
+        activeSchemeId: '',
+        previewTags: 'ahegao, rolling eyes, tongue out, open mouth, drooling, saliva, fellatio, oral, 1boy, penis, looking at viewer',
         commonPrefix: 'masterpiece, best quality, absurdres, very aesthetic, anime coloring, year 2025',
         negative: 'lowres, worst quality, bad anatomy, extra fingers, extra legs, child, loli, cute face, text, watermark, logo, jpeg artifacts, artistic error',
         useLlmScene: false,
@@ -124,6 +128,7 @@
             }
         }
         if (!s.identities || typeof s.identities !== 'object') s.identities = {};
+        if (!Array.isArray(s.schemes)) s.schemes = [];
         return s;
     }
 
@@ -208,7 +213,7 @@
         const scene = sceneParts.join(', ');
         const face = sceneRows.find(r => r.id === 'ahegao' || r.id === 'endure');
         const charPrompt = [identity, face ? face.tags : ''].filter(Boolean).join(', ');
-        const base = [s.commonPrefix, scene, s.suffix].filter(Boolean).join(', ');
+        const base = [s.commonPrefix, s.artist, scene, s.suffix].filter(Boolean).join(', ');
         let negative = s.negative;
         if (!sceneRows.some(r => r.id === 'ahegao')) {
             negative += ', ahegao, rolling eyes, tongue out, fucked silly, heart-shaped pupils';
@@ -458,6 +463,7 @@
             `【base】\n${built.base}\n\n` +
             `【character】\n${built.charPrompt}\n\n` +
             `【negative】\n${built.negative}\n\n` +
+            `【画师串】\n${getSettings().artist || '（空）'}\n\n` +
             `【采样】\n${getSettings().sampler || 'k_euler_ancestral'} / ${getSettings().noiseSchedule || 'karras'} / steps ${getSettings().steps} / cfg ${getSettings().scale} / seed ${getSettings().seed}`;
     }
 
@@ -593,6 +599,8 @@
         }
         const char = document.getElementById('nsd_f_char');
         if (char) char.textContent = charDisplayName();
+        const sch = document.getElementById('nsd_f_scheme_state');
+        if (sch) sch.textContent = currentScheme()?.name || '无方案';
         const dot = document.getElementById('nsd_launcher_dot');
         if (dot && !generating) {
             dot.classList.toggle('is-ok', idOk && Boolean(s.apiToken));
@@ -683,6 +691,7 @@
         applyPanelPos();
         reloadIdentityField();
         refreshSceneChips();
+        syncFloatNaiFields();
     }
 
     function hidePanel() {
@@ -744,6 +753,7 @@
             </header>
             <nav class="nsd-tabs">
                 <button type="button" class="nsd-tab is-on" data-nsd-tab="draw">出图</button>
+                <button type="button" class="nsd-tab" data-nsd-tab="artist">画师串</button>
                 <button type="button" class="nsd-tab" data-nsd-tab="params">参数</button>
                 <button type="button" class="nsd-tab" data-nsd-tab="char">角色</button>
                 <button type="button" class="nsd-tab" data-nsd-tab="setup">连接</button>
@@ -754,6 +764,7 @@
                         <span id="nsd_f_id_state" class="nsd-pill nsd-pill-warn">身份证未填</span>
                         <span id="nsd_f_proxy_state" class="nsd-pill">代理</span>
                         <span id="nsd_f_model_state" class="nsd-pill">4.5 Full</span>
+                        <span id="nsd_f_scheme_state" class="nsd-pill">无方案</span>
                     </div>
                     <div class="nsd-label">本轮情景（跟正文走，不是手动开关）</div>
                     <div id="nsd_chips" class="nsd-chips">
@@ -774,6 +785,10 @@
                             </select>
                         </label>
                     </div>
+                    <div class="nsd-field">
+                        <label>当前画师串</label>
+                        <textarea id="nsd_f_artist" class="text_pole" rows="2" placeholder="artist:xxx, year 2024"></textarea>
+                    </div>
                     <div class="nsd-actions">
                         <button id="nsd_f_preview" class="nsd-btn nsd-btn-ghost" type="button">预览</button>
                         <button id="nsd_f_gen" class="nsd-btn nsd-btn-primary" type="button">出图</button>
@@ -787,6 +802,36 @@
                         <pre id="nsd_f_preview_box" class="nsd-preview"></pre>
                     </details>
                 </section>
+
+                <section class="nsd-tab-pane" data-nsd-pane="artist">
+                    <p class="nsd-hint">点效果图切换画师串。默认预览标签：哈嘿颜口交（ahegao + fellatio）。</p>
+                    <div class="nsd-row nsd-compact">
+                        <label>方案
+                            <select id="nsd_f_scheme" class="text_pole"></select>
+                        </label>
+                    </div>
+                    <div class="nsd-field">
+                        <label for="nsd_f_scheme_name">方案名</label>
+                        <input id="nsd_f_scheme_name" class="text_pole" type="text" placeholder="例如 厚涂 / 水彩" />
+                    </div>
+                    <div class="nsd-field">
+                        <label for="nsd_f_scheme_artist">画师串</label>
+                        <textarea id="nsd_f_scheme_artist" class="text_pole" rows="3" placeholder="artist:xxx, artist:yyy, year 2024"></textarea>
+                    </div>
+                    <div class="nsd-field">
+                        <label for="nsd_f_preview_tags">效果图固定标签</label>
+                        <textarea id="nsd_f_preview_tags" class="text_pole" rows="2"></textarea>
+                    </div>
+                    <div class="nsd-actions nsd-actions-4">
+                        <button id="nsd_f_scheme_new" class="nsd-btn" type="button">新建</button>
+                        <button id="nsd_f_scheme_save" class="nsd-btn nsd-btn-primary" type="button">保存</button>
+                        <button id="nsd_f_scheme_preview" class="nsd-btn" type="button">生成效果图</button>
+                        <button id="nsd_f_scheme_del" class="nsd-btn" type="button">删除</button>
+                    </div>
+                    <div class="nsd-label">已保存方案（点击图片切换）</div>
+                    <div id="nsd_scheme_grid" class="nsd-scheme-grid"></div>
+                </section>
+
                 <section class="nsd-tab-pane" data-nsd-pane="params">
                     <div class="nsd-row nsd-compact">
                         <label>采样器
@@ -802,6 +847,16 @@
                         </label>
                     </div>
                     <div class="nsd-row nsd-compact">
+                        <label>噪点表
+                            <select id="nsd_f_noise" class="text_pole">
+                                <option value="karras">karras</option>
+                                <option value="native">native</option>
+                                <option value="exponential">exponential</option>
+                                <option value="polyexponential">polyexponential</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="nsd-row nsd-compact">
                         <label>尺寸
                             <select id="nsd_f_size" class="text_pole">
                                 <option value="832x1216">竖 832×1216</option>
@@ -809,20 +864,52 @@
                                 <option value="1024x1024">方 1024×1024</option>
                                 <option value="1024x1536">大竖 1024×1536</option>
                                 <option value="1536x1024">大横 1536×1024</option>
-                                <option value="custom">自定义（扩展设置）</option>
+                                <option value="custom">自定义</option>
                             </select>
                         </label>
+                    </div>
+                    <div class="nsd-row nsd-compact">
+                        <label>宽 <input id="nsd_f_width" class="text_pole" type="number" min="64" step="64" /></label>
+                        <label>高 <input id="nsd_f_height" class="text_pole" type="number" min="64" step="64" /></label>
                     </div>
                     <div class="nsd-row nsd-compact">
                         <label>步数 <input id="nsd_f_steps" class="text_pole" type="number" min="1" max="50" /></label>
                         <label>CFG <input id="nsd_f_scale" class="text_pole" type="number" min="1" max="20" step="0.1" /></label>
                     </div>
+                    <div class="nsd-row nsd-compact">
+                        <label>CFG Rescale <input id="nsd_f_cfg_rescale" class="text_pole" type="number" min="0" max="1" step="0.05" /></label>
+                        <label>张数 <input id="nsd_f_n_samples" class="text_pole" type="number" min="1" max="4" /></label>
+                    </div>
                     <div class="nsd-field">
                         <label for="nsd_f_seed">种子（-1 随机）</label>
                         <input id="nsd_f_seed" class="text_pole" type="number" />
                     </div>
-                    <p class="nsd-hint">噪点表、Variety、SMEA、负向预设在扩展设置里。</p>
+                    <div class="nsd-field">
+                        <label for="nsd_f_uc">UC Preset</label>
+                        <select id="nsd_f_uc" class="text_pole">
+                            <option value="0">Heavy</option>
+                            <option value="1">Light</option>
+                            <option value="2">Human Focus</option>
+                            <option value="3">None</option>
+                        </select>
+                    </div>
+                    <label class="checkbox_label"><input id="nsd_f_quality" type="checkbox" /> Quality Toggle</label>
+                    <label class="checkbox_label"><input id="nsd_f_variety" type="checkbox" /> Variety</label>
+                    <label class="checkbox_label"><input id="nsd_f_smea" type="checkbox" /> Auto SMEA</label>
+                    <div class="nsd-field">
+                        <label>画风前缀</label>
+                        <textarea id="nsd_f_prefix" class="text_pole" rows="2"></textarea>
+                    </div>
+                    <div class="nsd-field">
+                        <label>后置正面</label>
+                        <textarea id="nsd_f_suffix" class="text_pole" rows="2"></textarea>
+                    </div>
+                    <div class="nsd-field">
+                        <label>负向</label>
+                        <textarea id="nsd_f_negative" class="text_pole" rows="2"></textarea>
+                    </div>
                 </section>
+
                 <section class="nsd-tab-pane" data-nsd-pane="char">
                     <p class="nsd-hint">身份证每张图都带，不要写表情 / 洞 / 脱鞋。</p>
                     <div class="nsd-field">
@@ -830,9 +917,19 @@
                         <textarea id="nsd_f_identity" class="text_pole nsd-id-box" rows="6" placeholder="1girl, milf, huge breasts, wide hips, wedding ring, long hair, brown eyes"></textarea>
                     </div>
                 </section>
+
                 <section class="nsd-tab-pane" data-nsd-pane="setup">
-                    <p class="nsd-hint">Token 只放在扩展设置里，避免聊天界面误露。这里只看连接状态。</p>
-                    <p class="nsd-hint">扩展 → NAI 情景生图（锁外貌）里填写 Token、代理、画风和负向。</p>
+                    <div class="nsd-field">
+                        <label for="nsd_f_token">NovelAI Token</label>
+                        <input id="nsd_f_token" class="text_pole" type="password" autocomplete="off" />
+                    </div>
+                    <div class="nsd-field">
+                        <label for="nsd_f_api">API 地址</label>
+                        <input id="nsd_f_api" class="text_pole" type="text" />
+                    </div>
+                    <label class="checkbox_label"><input id="nsd_f_proxy" type="checkbox" /> 走服务端代理</label>
+                    <label class="checkbox_label"><input id="nsd_f_llm" type="checkbox" /> 用聊天模型译情景</label>
+                    <label class="checkbox_label"><input id="nsd_f_auto" type="checkbox" /> 回复后自动出图</label>
                     <div class="nsd-actions">
                         <button id="nsd_f_test" class="nsd-btn nsd-btn-ghost" type="button">测试连接</button>
                     </div>
@@ -882,21 +979,204 @@
         });
     }
 
+    function uid() {
+        return 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
+
+    function currentScheme() {
+        const s = getSettings();
+        return (s.schemes || []).find(x => x.id === s.activeSchemeId) || null;
+    }
+
+    function applyScheme(id) {
+        const s = getSettings();
+        const sc = (s.schemes || []).find(x => x.id === id);
+        if (!sc) return;
+        s.activeSchemeId = id;
+        s.artist = sc.artist || '';
+        saveSettings();
+        const a1 = document.getElementById('nsd_artist');
+        const a2 = document.getElementById('nsd_f_artist');
+        const a3 = document.getElementById('nsd_f_scheme_artist');
+        const n = document.getElementById('nsd_f_scheme_name');
+        if (a1) a1.value = s.artist;
+        if (a2) a2.value = s.artist;
+        if (a3) a3.value = s.artist;
+        if (n) n.value = sc.name || '';
+        const sel = document.getElementById('nsd_f_scheme');
+        if (sel) sel.value = id;
+        renderSchemeGrid();
+        updateFloatStatus();
+        toast('success', '已切换画师串：' + (sc.name || '未命名'));
+    }
+
+    function renderSchemeSelect() {
+        const s = getSettings();
+        const sel = document.getElementById('nsd_f_scheme');
+        if (!sel) return;
+        const cur = s.activeSchemeId;
+        sel.innerHTML = (s.schemes || []).map(sc =>
+            `<option value="${sc.id}">${(sc.name || '未命名').replace(/[<>&]/g, '')}</option>`
+        ).join('') || '<option value="">（还没有方案）</option>';
+        if (cur) sel.value = cur;
+    }
+
+    function renderSchemeGrid() {
+        const box = document.getElementById('nsd_scheme_grid');
+        if (!box) return;
+        const s = getSettings();
+        const list = s.schemes || [];
+        if (!list.length) {
+            box.innerHTML = '<p class="nsd-hint">还没有保存的方案。填画师串后点「新建 / 保存」，再点「生成效果图」。</p>';
+            return;
+        }
+        box.innerHTML = list.map(sc => {
+            const on = sc.id === s.activeSchemeId ? ' is-on' : '';
+            const img = sc.preview
+                ? `<img src="${sc.preview}" alt="${sc.name || ''}">`
+                : '<div class="nsd-scheme-ph">无效果图</div>';
+            return `<button type="button" class="nsd-scheme-card${on}" data-scheme="${sc.id}">${img}<span>${(sc.name || '未命名').replace(/[<>&]/g, '')}</span></button>`;
+        }).join('');
+        box.querySelectorAll('.nsd-scheme-card').forEach(btn => {
+            btn.addEventListener('click', () => applyScheme(btn.getAttribute('data-scheme')));
+        });
+    }
+
+    function saveCurrentScheme(asNew) {
+        const s = getSettings();
+        const name = (document.getElementById('nsd_f_scheme_name')?.value || '').trim() || '未命名';
+        const artist = (document.getElementById('nsd_f_scheme_artist')?.value
+            || document.getElementById('nsd_f_artist')?.value
+            || s.artist || '').trim();
+        if (!artist) {
+            toast('warning', '画师串是空的，先填再保存');
+            return;
+        }
+        if (asNew || !s.activeSchemeId) {
+            const sc = { id: uid(), name, artist, preview: '' };
+            s.schemes.push(sc);
+            s.activeSchemeId = sc.id;
+        } else {
+            const sc = currentScheme();
+            if (!sc) {
+                const neu = { id: uid(), name, artist, preview: '' };
+                s.schemes.push(neu);
+                s.activeSchemeId = neu.id;
+            } else {
+                sc.name = name;
+                sc.artist = artist;
+            }
+        }
+        s.artist = artist;
+        saveSettings();
+        const a1 = document.getElementById('nsd_artist');
+        if (a1) a1.value = artist;
+        renderSchemeSelect();
+        renderSchemeGrid();
+        updateFloatStatus();
+        toast('success', '方案已保存');
+    }
+
+    function deleteCurrentScheme() {
+        const s = getSettings();
+        if (!s.activeSchemeId) {
+            toast('info', '没有选中的方案');
+            return;
+        }
+        s.schemes = (s.schemes || []).filter(x => x.id !== s.activeSchemeId);
+        s.activeSchemeId = s.schemes[0]?.id || '';
+        if (s.schemes[0]) s.artist = s.schemes[0].artist || '';
+        saveSettings();
+        renderSchemeSelect();
+        renderSchemeGrid();
+        syncFloatNaiFields();
+        toast('info', '方案已删除');
+    }
+
+    async function generateSchemePreview() {
+        const s = getSettings();
+        const artist = (document.getElementById('nsd_f_scheme_artist')?.value || s.artist || '').trim();
+        if (!artist) {
+            toast('warning', '先填画师串再生成效果图');
+            return;
+        }
+        if (!s.activeSchemeId) saveCurrentScheme(true);
+        const tags = (document.getElementById('nsd_f_preview_tags')?.value || s.previewTags || '').trim();
+        const identity = getIdentity() || '1girl, milf, huge breasts, wide hips';
+        const built = {
+            identity,
+            base: [s.commonPrefix, artist, tags, s.suffix].filter(Boolean).join(', '),
+            charPrompt: [identity, 'ahegao, rolling eyes, tongue out, open mouth, drooling'].filter(Boolean).join(', '),
+            scene: tags,
+            negative: s.negative,
+            rows: [{ id: 'ahegao' }],
+        };
+        toast('info', '正在生成画师串效果图…');
+        setBusy(true);
+        try {
+            const dataUrl = await callNai(built);
+            const sc = currentScheme();
+            if (sc) {
+                sc.preview = dataUrl;
+                sc.artist = artist;
+                s.artist = artist;
+                saveSettings();
+            }
+            renderSchemeGrid();
+            toast('success', '效果图已更新，点击即可切换');
+        } catch (e) {
+            toast('error', e.message || String(e));
+        } finally {
+            setBusy(false);
+        }
+    }
+
     function syncFloatNaiFields() {
         const s = getSettings();
-        const map = {
-            nsd_f_model: 'model',
-            nsd_f_sampler: 'sampler',
-            nsd_f_steps: 'steps',
-            nsd_f_scale: 'scale',
-            nsd_f_seed: 'seed',
-            nsd_f_size: 'sizePreset',
+        const val = {
+            nsd_f_model: s.model,
+            nsd_f_sampler: s.sampler,
+            nsd_f_steps: s.steps,
+            nsd_f_scale: s.scale,
+            nsd_f_seed: s.seed,
+            nsd_f_size: s.sizePreset,
+            nsd_f_noise: s.noiseSchedule,
+            nsd_f_cfg_rescale: s.cfgRescale,
+            nsd_f_n_samples: s.nSamples,
+            nsd_f_width: s.width,
+            nsd_f_height: s.height,
+            nsd_f_uc: s.ucPreset,
+            nsd_f_prefix: s.commonPrefix,
+            nsd_f_suffix: s.suffix,
+            nsd_f_negative: s.negative,
+            nsd_f_artist: s.artist,
+            nsd_f_scheme_artist: s.artist,
+            nsd_f_preview_tags: s.previewTags,
+            nsd_f_api: s.apiBase,
+            nsd_f_token: s.apiToken,
         };
-        for (const [id, key] of Object.entries(map)) {
+        for (const [id, v] of Object.entries(val)) {
             const el = document.getElementById(id);
             if (!el || document.activeElement === el) continue;
-            el.value = s[key] ?? '';
+            el.value = v ?? '';
         }
+        const chk = {
+            nsd_f_quality: s.qualityToggle !== false,
+            nsd_f_variety: !!s.variety,
+            nsd_f_smea: !!s.autoSmea,
+            nsd_f_proxy: !!s.useProxy,
+            nsd_f_llm: !!s.useLlmScene,
+            nsd_f_auto: !!s.autoGenerate,
+        };
+        for (const [id, v] of Object.entries(chk)) {
+            const el = document.getElementById(id);
+            if (el) el.checked = v;
+        }
+        const sc = currentScheme();
+        const n = document.getElementById('nsd_f_scheme_name');
+        if (n && document.activeElement !== n) n.value = sc?.name || '';
+        renderSchemeSelect();
+        renderSchemeGrid();
     }
 
     function bindSettings() {
@@ -916,6 +1196,7 @@
         bindValue('nsd_size_preset', 'sizePreset', false);
         bindValue('nsd_prefix', 'commonPrefix', false);
         bindValue('nsd_suffix', 'suffix', false);
+        bindValue('nsd_artist', 'artist', false);
         bindValue('nsd_negative', 'negative', false);
         bindCheckbox('nsd_use_proxy', 'useProxy');
         bindCheckbox('nsd_use_llm', 'useLlmScene');
@@ -1065,6 +1346,62 @@
         bindFloatVal('nsd_f_scale', 'scale', true);
         bindFloatVal('nsd_f_seed', 'seed', true);
         bindFloatVal('nsd_f_size', 'sizePreset', false, (v) => applySizePreset(v));
+        bindFloatVal('nsd_f_noise', 'noiseSchedule', false);
+        bindFloatVal('nsd_f_cfg_rescale', 'cfgRescale', true);
+        bindFloatVal('nsd_f_n_samples', 'nSamples', true);
+        bindFloatVal('nsd_f_width', 'width', true, () => syncSizePresetFromWH());
+        bindFloatVal('nsd_f_height', 'height', true, () => syncSizePresetFromWH());
+        bindFloatVal('nsd_f_uc', 'ucPreset', true);
+        bindFloatVal('nsd_f_prefix', 'commonPrefix', false);
+        bindFloatVal('nsd_f_suffix', 'suffix', false);
+        bindFloatVal('nsd_f_negative', 'negative', false);
+        bindFloatVal('nsd_f_artist', 'artist', false);
+        bindFloatVal('nsd_f_preview_tags', 'previewTags', false);
+        bindFloatVal('nsd_f_api', 'apiBase', false);
+        bindFloatVal('nsd_f_token', 'apiToken', false);
+        const bindFloatChk = (id, key) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.checked = !!getSettings()[key];
+            el.addEventListener('change', () => {
+                getSettings()[key] = el.checked;
+                saveSettings();
+                const mirror = {
+                    qualityToggle: 'nsd_quality_toggle',
+                    variety: 'nsd_variety',
+                    autoSmea: 'nsd_auto_smea',
+                    useProxy: 'nsd_use_proxy',
+                    useLlmScene: 'nsd_use_llm',
+                    autoGenerate: 'nsd_auto',
+                }[key];
+                const m = mirror && document.getElementById(mirror);
+                if (m) m.checked = el.checked;
+                updateFloatStatus();
+            });
+        };
+        bindFloatChk('nsd_f_quality', 'qualityToggle');
+        bindFloatChk('nsd_f_variety', 'variety');
+        bindFloatChk('nsd_f_smea', 'autoSmea');
+        bindFloatChk('nsd_f_proxy', 'useProxy');
+        bindFloatChk('nsd_f_llm', 'useLlmScene');
+        bindFloatChk('nsd_f_auto', 'autoGenerate');
+        document.getElementById('nsd_f_scheme')?.addEventListener('change', (ev) => applyScheme(ev.target.value));
+        document.getElementById('nsd_f_scheme_new')?.addEventListener('click', () => {
+            getSettings().activeSchemeId = '';
+            const n = document.getElementById('nsd_f_scheme_name');
+            if (n) n.value = '';
+            saveCurrentScheme(true);
+        });
+        document.getElementById('nsd_f_scheme_save')?.addEventListener('click', () => saveCurrentScheme(false));
+        document.getElementById('nsd_f_scheme_del')?.addEventListener('click', deleteCurrentScheme);
+        document.getElementById('nsd_f_scheme_preview')?.addEventListener('click', () => {
+            generateSchemePreview().catch(e => toast('error', e.message || String(e)));
+        });
+        document.getElementById('nsd_f_scheme_artist')?.addEventListener('input', () => {
+            const v = document.getElementById('nsd_f_scheme_artist').value;
+            const a = document.getElementById('nsd_f_artist');
+            if (a && document.activeElement !== a) a.value = v;
+        });
         syncFloatNaiFields();
 
         document.getElementById('nsd_f_preview')?.addEventListener('click', () => {

@@ -149,8 +149,8 @@
 }
 
 .nsd-modal {
-    width: min(440px, 100%);
-    max-height: min(82vh, 760px);
+    width: min(520px, 100%);
+    max-height: min(86vh, 820px);
     display: flex;
     flex-direction: column;
     border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
@@ -330,6 +330,58 @@
     grid-template-columns: 1fr 1.4fr;
     gap: 8px;
     margin: 10px 0 8px;
+}
+
+.nsd-actions-4 {
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+
+.nsd-scheme-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.nsd-scheme-card {
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    overflow: hidden;
+    cursor: pointer;
+    text-align: center;
+}
+
+.nsd-scheme-card img,
+.nsd-scheme-ph {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    display: block;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.nsd-scheme-ph {
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    opacity: 0.6;
+}
+
+.nsd-scheme-card span {
+    display: block;
+    font-size: 11px;
+    padding: 4px 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.nsd-scheme-card.is-on {
+    border-color: var(--SmartThemeQuoteColor, #c9a27a);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--SmartThemeQuoteColor, #c9a27a) 55%, transparent);
 }
 
 .nsd-btn {
