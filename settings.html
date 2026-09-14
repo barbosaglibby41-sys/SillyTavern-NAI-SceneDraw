@@ -125,16 +125,16 @@
             <details class="nsd-section" open>
                 <summary>提示词</summary>
                 <div class="nsd-field">
-                    <label for="nsd_prefix">画风前缀（每张都有）</label>
+                    <label for="nsd_prefix">正面提示词备份（与方案正面同步）</label>
                     <textarea id="nsd_prefix" class="text_pole" rows="2"></textarea>
                 </div>
                 <div class="nsd-field">
-                    <label for="nsd_artist">当前画师串</label>
-                    <textarea id="nsd_artist" class="text_pole" rows="2" placeholder="artist:xxx, year 2024, ..."></textarea>
-                    <small>方案切换、点效果图，改的就是这一串。完整管理在悬浮窗「画师串」页。</small>
+                    <label for="nsd_artist">当前正面提示词</label>
+                    <textarea id="nsd_artist" class="text_pole" rows="2" placeholder="masterpiece, artist:xxx, year 2024"></textarea>
+                    <small>完整管理在悬浮窗「画师串」页。保存方案时会连同后置正、反提示词一起存。</small>
                 </div>
                 <div class="nsd-field">
-                    <label for="nsd_suffix">后置固定正面（可选）</label>
+                    <label for="nsd_suffix">后置正提示词</label>
                     <textarea id="nsd_suffix" class="text_pole" rows="2" placeholder="year 2025, cinematic lighting"></textarea>
                 </div>
                 <div class="nsd-field">

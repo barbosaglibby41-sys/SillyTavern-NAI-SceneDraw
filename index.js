@@ -463,7 +463,7 @@
             `【base】\n${built.base}\n\n` +
             `【character】\n${built.charPrompt}\n\n` +
             `【negative】\n${built.negative}\n\n` +
-            `【画师串】\n${getSettings().artist || '（空）'}\n\n` +
+            `【正面提示词】\n${getSettings().artist || '（空）'}\n\n` +
             `【采样】\n${getSettings().sampler || 'k_euler_ancestral'} / ${getSettings().noiseSchedule || 'karras'} / steps ${getSettings().steps} / cfg ${getSettings().scale} / seed ${getSettings().seed}`;
     }
 
@@ -786,8 +786,8 @@
                         </label>
                     </div>
                     <div class="nsd-field">
-                        <label>当前画师串</label>
-                        <textarea id="nsd_f_artist" class="text_pole" rows="2" placeholder="artist:xxx, year 2024"></textarea>
+                        <label>当前正面提示词</label>
+                        <textarea id="nsd_f_artist" class="text_pole" rows="2" placeholder="masterpiece, artist:xxx"></textarea>
                     </div>
                     <div class="nsd-actions">
                         <button id="nsd_f_preview" class="nsd-btn nsd-btn-ghost" type="button">预览</button>
@@ -804,7 +804,7 @@
                 </section>
 
                 <section class="nsd-tab-pane" data-nsd-pane="artist">
-                    <p class="nsd-hint">点效果图切换画师串。默认预览标签：哈嘿颜口交（ahegao + fellatio）。</p>
+                    <p class="nsd-hint">点效果图切换整套提示词方案（正面 + 后置 + 负向）。默认效果图标签：哈嘿颜口交。</p>
                     <div class="nsd-row nsd-compact">
                         <label>方案
                             <select id="nsd_f_scheme" class="text_pole"></select>
@@ -815,8 +815,16 @@
                         <input id="nsd_f_scheme_name" class="text_pole" type="text" placeholder="例如 厚涂 / 水彩" />
                     </div>
                     <div class="nsd-field">
-                        <label for="nsd_f_scheme_artist">画师串</label>
-                        <textarea id="nsd_f_scheme_artist" class="text_pole" rows="3" placeholder="artist:xxx, artist:yyy, year 2024"></textarea>
+                        <label for="nsd_f_scheme_artist">正面提示词（含画师串 / 画风前缀）</label>
+                        <textarea id="nsd_f_scheme_artist" class="text_pole" rows="3" placeholder="masterpiece, artist:xxx, year 2024"></textarea>
+                    </div>
+                    <div class="nsd-field">
+                        <label for="nsd_f_scheme_suffix">后置正提示词</label>
+                        <textarea id="nsd_f_scheme_suffix" class="text_pole" rows="2" placeholder="cinematic lighting, ..."></textarea>
+                    </div>
+                    <div class="nsd-field">
+                        <label for="nsd_f_scheme_negative">反提示词</label>
+                        <textarea id="nsd_f_scheme_negative" class="text_pole" rows="3" placeholder="lowres, worst quality, ..."></textarea>
                     </div>
                     <div class="nsd-field">
                         <label for="nsd_f_preview_tags">效果图固定标签</label>
@@ -896,18 +904,7 @@
                     <label class="checkbox_label"><input id="nsd_f_quality" type="checkbox" /> Quality Toggle</label>
                     <label class="checkbox_label"><input id="nsd_f_variety" type="checkbox" /> Variety</label>
                     <label class="checkbox_label"><input id="nsd_f_smea" type="checkbox" /> Auto SMEA</label>
-                    <div class="nsd-field">
-                        <label>画风前缀</label>
-                        <textarea id="nsd_f_prefix" class="text_pole" rows="2"></textarea>
-                    </div>
-                    <div class="nsd-field">
-                        <label>后置正面</label>
-                        <textarea id="nsd_f_suffix" class="text_pole" rows="2"></textarea>
-                    </div>
-                    <div class="nsd-field">
-                        <label>负向</label>
-                        <textarea id="nsd_f_negative" class="text_pole" rows="2"></textarea>
-                    </div>
+                    <p class="nsd-hint">正面 / 后置 / 负向在「画师串」方案里保存和切换。</p>
                 </section>
 
                 <section class="nsd-tab-pane" data-nsd-pane="char">
@@ -988,26 +985,41 @@
         return (s.schemes || []).find(x => x.id === s.activeSchemeId) || null;
     }
 
+    function fillPromptFields(s) {
+        const map = {
+            nsd_artist: s.artist,
+            nsd_f_artist: s.artist,
+            nsd_f_scheme_artist: s.artist,
+            nsd_prefix: s.commonPrefix,
+            nsd_suffix: s.suffix,
+            nsd_negative: s.negative,
+            nsd_f_scheme_suffix: s.suffix,
+            nsd_f_scheme_negative: s.negative,
+        };
+        for (const [id, v] of Object.entries(map)) {
+            const el = document.getElementById(id);
+            if (el && document.activeElement !== el) el.value = v || '';
+        }
+    }
+
     function applyScheme(id) {
         const s = getSettings();
         const sc = (s.schemes || []).find(x => x.id === id);
         if (!sc) return;
         s.activeSchemeId = id;
-        s.artist = sc.artist || '';
+        s.artist = sc.artist || sc.prefix || '';
+        if (sc.prefix) s.commonPrefix = sc.prefix;
+        if (sc.suffix != null) s.suffix = sc.suffix;
+        if (sc.negative != null) s.negative = sc.negative;
         saveSettings();
-        const a1 = document.getElementById('nsd_artist');
-        const a2 = document.getElementById('nsd_f_artist');
-        const a3 = document.getElementById('nsd_f_scheme_artist');
+        fillPromptFields(s);
         const n = document.getElementById('nsd_f_scheme_name');
-        if (a1) a1.value = s.artist;
-        if (a2) a2.value = s.artist;
-        if (a3) a3.value = s.artist;
         if (n) n.value = sc.name || '';
         const sel = document.getElementById('nsd_f_scheme');
         if (sel) sel.value = id;
         renderSchemeGrid();
         updateFloatStatus();
-        toast('success', '已切换画师串：' + (sc.name || '未命名'));
+        toast('success', '已切换方案：' + (sc.name || '未命名'));
     }
 
     function renderSchemeSelect() {
@@ -1027,7 +1039,7 @@
         const s = getSettings();
         const list = s.schemes || [];
         if (!list.length) {
-            box.innerHTML = '<p class="nsd-hint">还没有保存的方案。填画师串后点「新建 / 保存」，再点「生成效果图」。</p>';
+            box.innerHTML = '<p class="nsd-hint">还没有保存的方案。填正面 / 后置 / 负向后点「新建 / 保存」，再点「生成效果图」。</p>';
             return;
         }
         box.innerHTML = list.map(sc => {
@@ -1042,39 +1054,51 @@
         });
     }
 
-    function saveCurrentScheme(asNew) {
+    function readSchemePrompts() {
         const s = getSettings();
-        const name = (document.getElementById('nsd_f_scheme_name')?.value || '').trim() || '未命名';
         const artist = (document.getElementById('nsd_f_scheme_artist')?.value
             || document.getElementById('nsd_f_artist')?.value
             || s.artist || '').trim();
-        if (!artist) {
-            toast('warning', '画师串是空的，先填再保存');
+        const suffix = (document.getElementById('nsd_f_scheme_suffix')?.value
+            ?? s.suffix ?? '').trim();
+        const negative = (document.getElementById('nsd_f_scheme_negative')?.value
+            ?? s.negative ?? '').trim();
+        return { artist, suffix, negative };
+    }
+
+    function saveCurrentScheme(asNew) {
+        const s = getSettings();
+        const name = (document.getElementById('nsd_f_scheme_name')?.value || '').trim() || '未命名';
+        const { artist, suffix, negative } = readSchemePrompts();
+        if (!artist && !suffix) {
+            toast('warning', '正面和后置都是空的，先填再保存');
             return;
         }
+        const payload = { name, artist, prefix: artist, suffix, negative };
         if (asNew || !s.activeSchemeId) {
-            const sc = { id: uid(), name, artist, preview: '' };
+            const sc = { id: uid(), preview: '', ...payload };
             s.schemes.push(sc);
             s.activeSchemeId = sc.id;
         } else {
             const sc = currentScheme();
             if (!sc) {
-                const neu = { id: uid(), name, artist, preview: '' };
+                const neu = { id: uid(), preview: '', ...payload };
                 s.schemes.push(neu);
                 s.activeSchemeId = neu.id;
             } else {
-                sc.name = name;
-                sc.artist = artist;
+                Object.assign(sc, payload);
             }
         }
         s.artist = artist;
+        s.commonPrefix = artist || s.commonPrefix;
+        s.suffix = suffix;
+        s.negative = negative;
         saveSettings();
-        const a1 = document.getElementById('nsd_artist');
-        if (a1) a1.value = artist;
+        fillPromptFields(s);
         renderSchemeSelect();
         renderSchemeGrid();
         updateFloatStatus();
-        toast('success', '方案已保存');
+        toast('success', '方案已保存（含后置正 / 反提示词）');
     }
 
     function deleteCurrentScheme() {
@@ -1085,7 +1109,12 @@
         }
         s.schemes = (s.schemes || []).filter(x => x.id !== s.activeSchemeId);
         s.activeSchemeId = s.schemes[0]?.id || '';
-        if (s.schemes[0]) s.artist = s.schemes[0].artist || '';
+        if (s.schemes[0]) {
+            const sc = s.schemes[0];
+            s.artist = sc.artist || sc.prefix || '';
+            if (sc.suffix != null) s.suffix = sc.suffix;
+            if (sc.negative != null) s.negative = sc.negative;
+        }
         saveSettings();
         renderSchemeSelect();
         renderSchemeGrid();
@@ -1095,9 +1124,9 @@
 
     async function generateSchemePreview() {
         const s = getSettings();
-        const artist = (document.getElementById('nsd_f_scheme_artist')?.value || s.artist || '').trim();
-        if (!artist) {
-            toast('warning', '先填画师串再生成效果图');
+        const { artist, suffix, negative } = readSchemePrompts();
+        if (!artist && !suffix) {
+            toast('warning', '先填正面或后置再生成效果图');
             return;
         }
         if (!s.activeSchemeId) saveCurrentScheme(true);
@@ -1105,13 +1134,13 @@
         const identity = getIdentity() || '1girl, milf, huge breasts, wide hips';
         const built = {
             identity,
-            base: [s.commonPrefix, artist, tags, s.suffix].filter(Boolean).join(', '),
+            base: [artist, tags, suffix].filter(Boolean).join(', '),
             charPrompt: [identity, 'ahegao, rolling eyes, tongue out, open mouth, drooling'].filter(Boolean).join(', '),
             scene: tags,
-            negative: s.negative,
+            negative: negative || s.negative,
             rows: [{ id: 'ahegao' }],
         };
-        toast('info', '正在生成画师串效果图…');
+        toast('info', '正在生成方案效果图…');
         setBusy(true);
         try {
             const dataUrl = await callNai(built);
@@ -1119,7 +1148,12 @@
             if (sc) {
                 sc.preview = dataUrl;
                 sc.artist = artist;
+                sc.prefix = artist;
+                sc.suffix = suffix;
+                sc.negative = negative;
                 s.artist = artist;
+                s.suffix = suffix;
+                s.negative = negative;
                 saveSettings();
             }
             renderSchemeGrid();
@@ -1146,11 +1180,10 @@
             nsd_f_width: s.width,
             nsd_f_height: s.height,
             nsd_f_uc: s.ucPreset,
-            nsd_f_prefix: s.commonPrefix,
-            nsd_f_suffix: s.suffix,
-            nsd_f_negative: s.negative,
             nsd_f_artist: s.artist,
             nsd_f_scheme_artist: s.artist,
+            nsd_f_scheme_suffix: s.suffix,
+            nsd_f_scheme_negative: s.negative,
             nsd_f_preview_tags: s.previewTags,
             nsd_f_api: s.apiBase,
             nsd_f_token: s.apiToken,
@@ -1352,11 +1385,28 @@
         bindFloatVal('nsd_f_width', 'width', true, () => syncSizePresetFromWH());
         bindFloatVal('nsd_f_height', 'height', true, () => syncSizePresetFromWH());
         bindFloatVal('nsd_f_uc', 'ucPreset', true);
-        bindFloatVal('nsd_f_prefix', 'commonPrefix', false);
-        bindFloatVal('nsd_f_suffix', 'suffix', false);
-        bindFloatVal('nsd_f_negative', 'negative', false);
         bindFloatVal('nsd_f_artist', 'artist', false);
         bindFloatVal('nsd_f_preview_tags', 'previewTags', false);
+        const bindSchemePrompt = (id, key) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('change', () => {
+                getSettings()[key] = el.value;
+                saveSettings();
+                const mirrors = {
+                    artist: ['nsd_artist', 'nsd_f_artist', 'nsd_prefix'],
+                    suffix: ['nsd_suffix'],
+                    negative: ['nsd_negative'],
+                }[key] || [];
+                mirrors.forEach(mid => {
+                    const m = document.getElementById(mid);
+                    if (m && document.activeElement !== m) m.value = el.value;
+                });
+            });
+        };
+        bindSchemePrompt('nsd_f_scheme_artist', 'artist');
+        bindSchemePrompt('nsd_f_scheme_suffix', 'suffix');
+        bindSchemePrompt('nsd_f_scheme_negative', 'negative');
         bindFloatVal('nsd_f_api', 'apiBase', false);
         bindFloatVal('nsd_f_token', 'apiToken', false);
         const bindFloatChk = (id, key) => {
@@ -1401,6 +1451,12 @@
             const v = document.getElementById('nsd_f_scheme_artist').value;
             const a = document.getElementById('nsd_f_artist');
             if (a && document.activeElement !== a) a.value = v;
+        });
+        document.getElementById('nsd_f_scheme_suffix')?.addEventListener('input', () => {
+            getSettings().suffix = document.getElementById('nsd_f_scheme_suffix').value;
+        });
+        document.getElementById('nsd_f_scheme_negative')?.addEventListener('input', () => {
+            getSettings().negative = document.getElementById('nsd_f_scheme_negative').value;
         });
         syncFloatNaiFields();
 
