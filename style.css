@@ -48,6 +48,19 @@
     margin-top: 0.2em;
 }
 
+.nai-scene-draw-settings .nsd-section {
+    margin: 0.8em 0;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.1));
+    border-radius: 10px;
+    padding: 0.35em 0.7em 0.55em;
+}
+
+.nai-scene-draw-settings .nsd-section > summary {
+    cursor: pointer;
+    font-weight: 650;
+    padding: 0.35em 0;
+}
+
 /* ===== 悬浮球（参考茶馆圆球，不是小卡片） ===== */
 #nsd_float_root {
     position: static;

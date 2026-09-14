@@ -21,6 +21,17 @@
         height: 1216,
         steps: 28,
         scale: 5,
+        sampler: 'k_euler_ancestral',
+        noiseSchedule: 'karras',
+        cfgRescale: 0,
+        nSamples: 1,
+        seed: -1,
+        qualityToggle: true,
+        variety: false,
+        autoSmea: false,
+        ucPreset: 0,
+        sizePreset: '832x1216',
+        suffix: '',
         commonPrefix: 'masterpiece, best quality, absurdres, very aesthetic, anime coloring, year 2025',
         negative: 'lowres, worst quality, bad anatomy, extra fingers, extra legs, child, loli, cute face, text, watermark, logo, jpeg artifacts, artistic error',
         useLlmScene: false,
@@ -34,6 +45,16 @@
         launcherX: null,
         launcherY: null,
     });
+
+    const SIZE_PRESETS = {
+        '832x1216': [832, 1216],
+        '1216x832': [1216, 832],
+        '1024x1024': [1024, 1024],
+        '1024x1536': [1024, 1536],
+        '1536x1024': [1536, 1024],
+        '512x768': [512, 768],
+        '768x512': [768, 512],
+    };
 
     const LEXICON = [
         {
@@ -187,7 +208,7 @@
         const scene = sceneParts.join(', ');
         const face = sceneRows.find(r => r.id === 'ahegao' || r.id === 'endure');
         const charPrompt = [identity, face ? face.tags : ''].filter(Boolean).join(', ');
-        const base = [s.commonPrefix, scene].filter(Boolean).join(', ');
+        const base = [s.commonPrefix, scene, s.suffix].filter(Boolean).join(', ');
         let negative = s.negative;
         if (!sceneRows.some(r => r.id === 'ahegao')) {
             negative += ', ahegao, rolling eyes, tongue out, fucked silly, heart-shaped pupils';
@@ -259,48 +280,58 @@
         return `data:image/png;base64,${btoa(bin)}`;
     }
 
+    function resolveSeed(s) {
+        const raw = Number(s.seed);
+        if (!Number.isFinite(raw) || raw < 0) return Math.floor(Math.random() * 2 ** 31);
+        return Math.floor(raw);
+    }
+
     function naiBody(built) {
         const s = getSettings();
-        const seed = Math.floor(Math.random() * 2 ** 31);
+        const seed = resolveSeed(s);
         const charCaption = built.charPrompt || built.identity || built.base;
         const hasChar = Boolean(built.identity);
+        const parameters = {
+            params_version: 3,
+            width: Number(s.width) || 832,
+            height: Number(s.height) || 1216,
+            scale: Number(s.scale) || 5,
+            sampler: s.sampler || 'k_euler_ancestral',
+            steps: Number(s.steps) || 28,
+            n_samples: Math.min(4, Math.max(1, Number(s.nSamples) || 1)),
+            ucPreset: Number(s.ucPreset) || 0,
+            qualityToggle: s.qualityToggle !== false,
+            noise_schedule: s.noiseSchedule || 'karras',
+            cfg_rescale: Number(s.cfgRescale) || 0,
+            autoSmea: !!s.autoSmea,
+            seed,
+            extra_noise_seed: seed,
+            negative_prompt: built.negative,
+            use_coords: false,
+            characterPrompts: hasChar
+                ? [{ prompt: charCaption, uc: '', center: { x: 0.5, y: 0.5 }, enabled: true }]
+                : [],
+            v4_prompt: {
+                caption: {
+                    base_caption: built.base || 'masterpiece, best quality',
+                    char_captions: hasChar
+                        ? [{ char_caption: charCaption, centers: [{ x: 0.5, y: 0.5 }] }]
+                        : [],
+                },
+                use_coords: false,
+                use_order: true,
+            },
+            v4_negative_prompt: {
+                caption: { base_caption: built.negative, char_captions: [] },
+                legacy_uc: false,
+            },
+        };
+        if (s.variety) parameters.skip_cfg_above_sigma = 19;
         return {
             input: [built.base, charCaption].filter(Boolean).join(', '),
             model: s.model,
             action: 'generate',
-            parameters: {
-                params_version: 3,
-                width: Number(s.width) || 832,
-                height: Number(s.height) || 1216,
-                scale: Number(s.scale) || 5,
-                sampler: 'k_euler_ancestral',
-                steps: Number(s.steps) || 28,
-                n_samples: 1,
-                ucPreset: 0,
-                qualityToggle: true,
-                noise_schedule: 'karras',
-                seed,
-                extra_noise_seed: seed,
-                negative_prompt: built.negative,
-                use_coords: false,
-                characterPrompts: hasChar
-                    ? [{ prompt: charCaption, uc: '', center: { x: 0.5, y: 0.5 }, enabled: true }]
-                    : [],
-                v4_prompt: {
-                    caption: {
-                        base_caption: built.base || 'masterpiece, best quality',
-                        char_captions: hasChar
-                            ? [{ char_caption: charCaption, centers: [{ x: 0.5, y: 0.5 }] }]
-                            : [],
-                    },
-                    use_coords: false,
-                    use_order: true,
-                },
-                v4_negative_prompt: {
-                    caption: { base_caption: built.negative, char_captions: [] },
-                    legacy_uc: false,
-                },
-            },
+            parameters,
         };
     }
 
@@ -426,7 +457,8 @@
             `【本轮情景】\n${built.scene || '（正文没勾中足/洞/阿嘿颜，只会画正常脸）'}\n\n` +
             `【base】\n${built.base}\n\n` +
             `【character】\n${built.charPrompt}\n\n` +
-            `【negative】\n${built.negative}`;
+            `【negative】\n${built.negative}\n\n` +
+            `【采样】\n${getSettings().sampler || 'k_euler_ancestral'} / ${getSettings().noiseSchedule || 'karras'} / steps ${getSettings().steps} / cfg ${getSettings().scale} / seed ${getSettings().seed}`;
     }
 
     function previewToBox(built) {
@@ -516,6 +548,7 @@
         if (m2 && document.activeElement !== m2) m2.value = model;
         updateFloatStatus();
         refreshSceneChips();
+        syncFloatNaiFields();
     }
 
     function updateChips(rows) {
@@ -711,6 +744,7 @@
             </header>
             <nav class="nsd-tabs">
                 <button type="button" class="nsd-tab is-on" data-nsd-tab="draw">出图</button>
+                <button type="button" class="nsd-tab" data-nsd-tab="params">参数</button>
                 <button type="button" class="nsd-tab" data-nsd-tab="char">角色</button>
                 <button type="button" class="nsd-tab" data-nsd-tab="setup">连接</button>
             </nav>
@@ -753,6 +787,42 @@
                         <pre id="nsd_f_preview_box" class="nsd-preview"></pre>
                     </details>
                 </section>
+                <section class="nsd-tab-pane" data-nsd-pane="params">
+                    <div class="nsd-row nsd-compact">
+                        <label>采样器
+                            <select id="nsd_f_sampler" class="text_pole">
+                                <option value="k_euler_ancestral">Euler Ancestral</option>
+                                <option value="k_euler">Euler</option>
+                                <option value="k_dpmpp_2s_ancestral">DPM++ 2S Ancestral</option>
+                                <option value="k_dpmpp_2m">DPM++ 2M</option>
+                                <option value="k_dpmpp_2m_sde">DPM++ 2M SDE</option>
+                                <option value="k_dpmpp_sde">DPM++ SDE</option>
+                                <option value="ddim_v3">DDIM</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="nsd-row nsd-compact">
+                        <label>尺寸
+                            <select id="nsd_f_size" class="text_pole">
+                                <option value="832x1216">竖 832×1216</option>
+                                <option value="1216x832">横 1216×832</option>
+                                <option value="1024x1024">方 1024×1024</option>
+                                <option value="1024x1536">大竖 1024×1536</option>
+                                <option value="1536x1024">大横 1536×1024</option>
+                                <option value="custom">自定义（扩展设置）</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="nsd-row nsd-compact">
+                        <label>步数 <input id="nsd_f_steps" class="text_pole" type="number" min="1" max="50" /></label>
+                        <label>CFG <input id="nsd_f_scale" class="text_pole" type="number" min="1" max="20" step="0.1" /></label>
+                    </div>
+                    <div class="nsd-field">
+                        <label for="nsd_f_seed">种子（-1 随机）</label>
+                        <input id="nsd_f_seed" class="text_pole" type="number" />
+                    </div>
+                    <p class="nsd-hint">噪点表、Variety、SMEA、负向预设在扩展设置里。</p>
+                </section>
                 <section class="nsd-tab-pane" data-nsd-pane="char">
                     <p class="nsd-hint">身份证每张图都带，不要写表情 / 洞 / 脱鞋。</p>
                     <div class="nsd-field">
@@ -771,6 +841,64 @@
         </div>
     </div>`;
 
+    function applySizePreset(key) {
+        const s = getSettings();
+        s.sizePreset = key;
+        const pair = SIZE_PRESETS[key];
+        if (pair) {
+            s.width = pair[0];
+            s.height = pair[1];
+            const w = document.getElementById('nsd_width');
+            const h = document.getElementById('nsd_height');
+            if (w) w.value = s.width;
+            if (h) h.value = s.height;
+            const fw = document.getElementById('nsd_f_width');
+            const fh = document.getElementById('nsd_f_height');
+            if (fw) fw.value = s.width;
+            if (fh) fh.value = s.height;
+        }
+        saveSettings();
+    }
+
+    function syncSizePresetFromWH() {
+        const s = getSettings();
+        const key = `${Number(s.width)}x${Number(s.height)}`;
+        s.sizePreset = SIZE_PRESETS[key] ? key : 'custom';
+        const sel = document.getElementById('nsd_size_preset');
+        const fsel = document.getElementById('nsd_f_size');
+        if (sel) sel.value = s.sizePreset;
+        if (fsel) fsel.value = s.sizePreset;
+        saveSettings();
+    }
+
+    function bindSizePreset() {
+        const sel = document.getElementById('nsd_size_preset');
+        if (sel) {
+            sel.value = getSettings().sizePreset || '832x1216';
+            sel.addEventListener('change', () => applySizePreset(sel.value));
+        }
+        ['nsd_width', 'nsd_height'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', syncSizePresetFromWH);
+        });
+    }
+
+    function syncFloatNaiFields() {
+        const s = getSettings();
+        const map = {
+            nsd_f_model: 'model',
+            nsd_f_sampler: 'sampler',
+            nsd_f_steps: 'steps',
+            nsd_f_scale: 'scale',
+            nsd_f_seed: 'seed',
+            nsd_f_size: 'sizePreset',
+        };
+        for (const [id, key] of Object.entries(map)) {
+            const el = document.getElementById(id);
+            if (!el || document.activeElement === el) continue;
+            el.value = s[key] ?? '';
+        }
+    }
+
     function bindSettings() {
         bindValue('nsd_token', 'apiToken', false);
         bindValue('nsd_api_base', 'apiBase', false);
@@ -779,12 +907,25 @@
         bindValue('nsd_height', 'height', true);
         bindValue('nsd_steps', 'steps', true);
         bindValue('nsd_scale', 'scale', true);
+        bindValue('nsd_sampler', 'sampler', false);
+        bindValue('nsd_noise_schedule', 'noiseSchedule', false);
+        bindValue('nsd_cfg_rescale', 'cfgRescale', true);
+        bindValue('nsd_n_samples', 'nSamples', true);
+        bindValue('nsd_seed', 'seed', true);
+        bindValue('nsd_uc_preset', 'ucPreset', true);
+        bindValue('nsd_size_preset', 'sizePreset', false);
         bindValue('nsd_prefix', 'commonPrefix', false);
+        bindValue('nsd_suffix', 'suffix', false);
         bindValue('nsd_negative', 'negative', false);
         bindCheckbox('nsd_use_proxy', 'useProxy');
         bindCheckbox('nsd_use_llm', 'useLlmScene');
         bindCheckbox('nsd_auto', 'autoGenerate');
         bindCheckbox('nsd_show_float', 'showFloat');
+        bindCheckbox('nsd_quality_toggle', 'qualityToggle');
+        bindCheckbox('nsd_variety', 'variety');
+        bindCheckbox('nsd_auto_smea', 'autoSmea');
+        bindSizePreset();
+        syncFloatNaiFields();
 
         document.getElementById('nsd_show_float')?.addEventListener('change', updateFloatStatus);
         document.getElementById('nsd_use_proxy')?.addEventListener('change', updateFloatStatus);
@@ -901,6 +1042,30 @@
                 updateFloatStatus();
             });
         }
+        const bindFloatVal = (id, key, numeric, extra) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.value = getSettings()[key] ?? '';
+            el.addEventListener('change', () => {
+                getSettings()[key] = numeric ? Number(el.value) : el.value;
+                saveSettings();
+                if (typeof extra === 'function') extra(el.value);
+                const mirror = document.getElementById({
+                    sampler: 'nsd_sampler',
+                    steps: 'nsd_steps',
+                    scale: 'nsd_scale',
+                    seed: 'nsd_seed',
+                    sizePreset: 'nsd_size_preset',
+                }[key] || '');
+                if (mirror) mirror.value = el.value;
+            });
+        };
+        bindFloatVal('nsd_f_sampler', 'sampler', false);
+        bindFloatVal('nsd_f_steps', 'steps', true);
+        bindFloatVal('nsd_f_scale', 'scale', true);
+        bindFloatVal('nsd_f_seed', 'seed', true);
+        bindFloatVal('nsd_f_size', 'sizePreset', false, (v) => applySizePreset(v));
+        syncFloatNaiFields();
 
         document.getElementById('nsd_f_preview')?.addEventListener('click', () => {
             generateNow(true).catch(e => toast('error', e.message || String(e)));

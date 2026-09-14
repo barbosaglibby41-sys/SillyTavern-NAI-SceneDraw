@@ -1,11 +1,10 @@
 <div id="nsd_float_root">
-    <button id="nsd_launcher" class="nsd-fab" type="button" title="NAI 情景生图">
+<button id="nsd_launcher" class="nsd-fab" type="button" title="NAI 情景生图">
         <i class="fa-solid fa-paintbrush"></i>
         <span id="nsd_launcher_dot" class="nsd-fab-dot"></span>
     </button>
-
     <div id="nsd_overlay" class="nsd-overlay" hidden>
-        <div id="nsd_modal" class="nsd-modal" role="dialog" aria-modal="true">
+        <div id="nsd_modal" class="nsd-modal" role="dialog">
             <header class="nsd-modal-head">
                 <div class="nsd-modal-title">
                     <span class="nsd-logo">NAI</span>
@@ -16,13 +15,12 @@
                 </div>
                 <button id="nsd_btn_hide" class="nsd-icon-btn" type="button" title="关闭">×</button>
             </header>
-
             <nav class="nsd-tabs">
                 <button type="button" class="nsd-tab is-on" data-nsd-tab="draw">出图</button>
+                <button type="button" class="nsd-tab" data-nsd-tab="params">参数</button>
                 <button type="button" class="nsd-tab" data-nsd-tab="char">角色</button>
                 <button type="button" class="nsd-tab" data-nsd-tab="setup">连接</button>
             </nav>
-
             <div class="nsd-modal-body">
                 <section class="nsd-tab-pane is-on" data-nsd-pane="draw">
                     <div class="nsd-status">
@@ -62,7 +60,42 @@
                         <pre id="nsd_f_preview_box" class="nsd-preview"></pre>
                     </details>
                 </section>
-
+                <section class="nsd-tab-pane" data-nsd-pane="params">
+                    <div class="nsd-row nsd-compact">
+                        <label>采样器
+                            <select id="nsd_f_sampler" class="text_pole">
+                                <option value="k_euler_ancestral">Euler Ancestral</option>
+                                <option value="k_euler">Euler</option>
+                                <option value="k_dpmpp_2s_ancestral">DPM++ 2S Ancestral</option>
+                                <option value="k_dpmpp_2m">DPM++ 2M</option>
+                                <option value="k_dpmpp_2m_sde">DPM++ 2M SDE</option>
+                                <option value="k_dpmpp_sde">DPM++ SDE</option>
+                                <option value="ddim_v3">DDIM</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="nsd-row nsd-compact">
+                        <label>尺寸
+                            <select id="nsd_f_size" class="text_pole">
+                                <option value="832x1216">竖 832×1216</option>
+                                <option value="1216x832">横 1216×832</option>
+                                <option value="1024x1024">方 1024×1024</option>
+                                <option value="1024x1536">大竖 1024×1536</option>
+                                <option value="1536x1024">大横 1536×1024</option>
+                                <option value="custom">自定义（扩展设置）</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="nsd-row nsd-compact">
+                        <label>步数 <input id="nsd_f_steps" class="text_pole" type="number" min="1" max="50" /></label>
+                        <label>CFG <input id="nsd_f_scale" class="text_pole" type="number" min="1" max="20" step="0.1" /></label>
+                    </div>
+                    <div class="nsd-field">
+                        <label for="nsd_f_seed">种子（-1 随机）</label>
+                        <input id="nsd_f_seed" class="text_pole" type="number" />
+                    </div>
+                    <p class="nsd-hint">噪点表、Variety、SMEA、负向预设在扩展设置里。</p>
+                </section>
                 <section class="nsd-tab-pane" data-nsd-pane="char">
                     <p class="nsd-hint">身份证每张图都带，不要写表情 / 洞 / 脱鞋。</p>
                     <div class="nsd-field">
@@ -70,7 +103,6 @@
                         <textarea id="nsd_f_identity" class="text_pole nsd-id-box" rows="6" placeholder="1girl, milf, huge breasts, wide hips, wedding ring, long hair, brown eyes"></textarea>
                     </div>
                 </section>
-
                 <section class="nsd-tab-pane" data-nsd-pane="setup">
                     <p class="nsd-hint">Token 只放在扩展设置里，避免聊天界面误露。这里只看连接状态。</p>
                     <p class="nsd-hint">扩展 → NAI 情景生图（锁外貌）里填写 Token、代理、画风和负向。</p>
