@@ -606,7 +606,7 @@
         if (!handle || !target) return;
         handle.addEventListener('pointerdown', (ev) => {
             if (ev.button !== 0) return;
-            if (ev.target.closest('button, input, textarea, select, a')) return;
+            if (target !== handle && ev.target.closest('button, input, textarea, select, a')) return;
             const rect = target.getBoundingClientRect();
             dragState = {
                 target,
@@ -665,6 +665,15 @@
         applyPanelPos();
     }
 
+    function extensionBasePath() {
+        try {
+            const scripts = Array.from(document.querySelectorAll('script[src]'));
+            const hit = scripts.find(s => /NAI-SceneDraw/i.test(s.src || ''));
+            if (hit) return hit.src.replace(/\/index\.js(\?.*)?$/i, '');
+        } catch (_) { /* ignore */ }
+        return `/scripts/extensions/${FOLDER}`;
+    }
+
     async function loadTemplate(name) {
         const c = ctx();
         try {
@@ -674,8 +683,83 @@
         } catch (err) {
             console.warn(`[${MODULE}] renderExtensionTemplateAsync ${name}`, err);
         }
-        return await $.get(`/scripts/extensions/${FOLDER}/${name}.html`);
+        const urls = [
+            `${extensionBasePath()}/${name}.html`,
+            `/scripts/extensions/${FOLDER}/${name}.html`,
+        ];
+        for (const url of urls) {
+            try {
+                const html = await $.get(url);
+                if (html) return html;
+            } catch (err) {
+                console.warn(`[${MODULE}] template ${url}`, err);
+            }
+        }
+        throw new Error(`无法加载 ${name}.html`);
     }
+
+    const FLOAT_HTML = `
+    <button id="nsd_launcher" class="nsd-launcher" type="button" title="NAI 情景生图">
+        <span class="nsd-launcher-mark">N</span>
+        <span id="nsd_launcher_dot" class="nsd-launcher-dot"></span>
+    </button>
+    <aside id="nsd_panel" class="nsd-panel" hidden>
+        <header id="nsd_panel_head" class="nsd-panel-head">
+            <div class="nsd-panel-title">
+                <span class="nsd-logo">NAI</span>
+                <div>
+                    <strong>情景生图</strong>
+                    <small id="nsd_f_char">未选择角色</small>
+                </div>
+            </div>
+            <div class="nsd-panel-actions">
+                <button id="nsd_btn_min" class="nsd-icon-btn" type="button" title="收起">–</button>
+                <button id="nsd_btn_hide" class="nsd-icon-btn" type="button" title="隐藏到按钮">×</button>
+            </div>
+        </header>
+        <div id="nsd_panel_body" class="nsd-panel-body">
+            <div id="nsd_f_status" class="nsd-status">
+                <span id="nsd_f_id_state" class="nsd-pill nsd-pill-warn">身份证未填</span>
+                <span id="nsd_f_proxy_state" class="nsd-pill">代理</span>
+                <span id="nsd_f_model_state" class="nsd-pill">4.5 Full</span>
+            </div>
+            <div class="nsd-label">本轮情景（跟正文走）</div>
+            <div id="nsd_chips" class="nsd-chips">
+                <span data-nsd-chip="endure" class="nsd-chip">隐忍</span>
+                <span data-nsd-chip="ahegao" class="nsd-chip">阿嘿颜</span>
+                <span data-nsd-chip="feet" class="nsd-chip">足 / 鞋袜</span>
+                <span data-nsd-chip="glory" class="nsd-chip">荣耀洞</span>
+                <span data-nsd-chip="foot_hole" class="nsd-chip">脚洞</span>
+            </div>
+            <p id="nsd_chip_hint" class="nsd-hint">日常对话不会点亮。写到了才会加标签。</p>
+            <div class="nsd-field">
+                <label for="nsd_f_identity">角色身份证</label>
+                <textarea id="nsd_f_identity" class="text_pole nsd-id-box" rows="3" placeholder="1girl, milf, huge breasts, wide hips, wedding ring, long hair, brown eyes"></textarea>
+            </div>
+            <div class="nsd-row nsd-compact">
+                <label>模型
+                    <select id="nsd_f_model" class="text_pole">
+                        <option value="nai-diffusion-4-5-full">4.5 Full</option>
+                        <option value="nai-diffusion-5-full">5 Full</option>
+                        <option value="nai-diffusion-4-5-curated">4.5 Curated</option>
+                        <option value="nai-diffusion-5-curated">5 Curated</option>
+                    </select>
+                </label>
+            </div>
+            <div class="nsd-actions">
+                <button id="nsd_f_preview" class="nsd-btn nsd-btn-ghost" type="button">预览</button>
+                <button id="nsd_f_gen" class="nsd-btn nsd-btn-primary" type="button">出图</button>
+            </div>
+            <div id="nsd_f_progress" class="nsd-progress" hidden>
+                <span class="nsd-spinner"></span>
+                <span>正在向 NAI 出图…</span>
+            </div>
+            <details class="nsd-details">
+                <summary>本轮提示词</summary>
+                <pre id="nsd_f_preview_box" class="nsd-preview"></pre>
+            </details>
+        </div>
+    </aside>`;
 
     function bindSettings() {
         bindValue('nsd_token', 'apiToken', false);
@@ -713,6 +797,13 @@
             });
         }
 
+        document.getElementById('nsd_btn_open_float')?.addEventListener('click', () => {
+            getSettings().showFloat = true;
+            saveSettings();
+            const box = document.getElementById('nsd_show_float');
+            if (box) box.checked = true;
+            mountFloat().then(() => openPanel()).catch(e => toast('error', e.message || String(e)));
+        });
         document.getElementById('nsd_btn_preview')?.addEventListener('click', () => {
             generateNow(true).catch(e => toast('error', e.message || String(e)));
         });
@@ -738,9 +829,11 @@
     }
 
     async function mountFloat() {
-        if (document.getElementById('nsd_float_root')) return;
-        const html = await loadTemplate('float');
-        document.body.insertAdjacentHTML('beforeend', html);
+        if (document.getElementById('nsd_launcher')) return;
+        const wrap = document.createElement('div');
+        wrap.id = 'nsd_float_root';
+        wrap.innerHTML = FLOAT_HTML;
+        document.body.appendChild(wrap);
 
         const launcher = document.getElementById('nsd_launcher');
         const panel = document.getElementById('nsd_panel');
@@ -881,21 +974,35 @@
         }
     }
 
-    jQuery(async () => {
+    async function boot() {
         try {
             const html = await loadTemplate('settings');
             const $host = $('#extensions_settings2').length ? $('#extensions_settings2') : $('#extensions_settings');
             $host.append(html);
             bindSettings();
-            await mountFloat();
-            hookEvents();
-            await registerSlash();
-            updateFloatStatus();
-            refreshSceneChips();
-            console.log(`[${MODULE}] loaded`);
         } catch (err) {
-            console.error(`[${MODULE}] init failed`, err);
-            toast('error', 'NAI 情景生图加载失败：' + (err.message || err));
+            console.error(`[${MODULE}] settings template failed`, err);
         }
-    });
+        try {
+            await mountFloat();
+        } catch (err) {
+            console.error(`[${MODULE}] float failed`, err);
+            toast('error', '悬浮窗加载失败：' + (err.message || err));
+        }
+        hookEvents();
+        try { await registerSlash(); } catch (err) {
+            console.warn(`[${MODULE}] slash failed`, err);
+        }
+        updateFloatStatus();
+        refreshSceneChips();
+        console.log(`[${MODULE}] loaded`);
+    }
+
+    if (window.jQuery) {
+        jQuery(boot);
+    } else if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
 })();
