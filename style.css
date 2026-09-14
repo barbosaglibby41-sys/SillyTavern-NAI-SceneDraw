@@ -48,125 +48,131 @@
     margin-top: 0.2em;
 }
 
-/* ===== 悬浮启动钮 ===== */
+/* ===== 悬浮球（参考茶馆圆球，不是小卡片） ===== */
 #nsd_float_root {
-    position: fixed;
-    inset: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 100000;
-    pointer-events: none;
-    overflow: visible;
+    position: static;
 }
 
-#nsd_float_root .nsd-launcher,
-#nsd_float_root .nsd-panel {
-    pointer-events: auto;
-}
-
-.nsd-launcher {
+.nsd-fab {
     position: fixed;
-    right: 18px;
-    bottom: 92px;
-    z-index: 100001;
-    width: 48px;
-    height: 48px;
-    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
-    border-radius: 16px;
-    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #1c1c24) 88%, #000);
-    color: var(--SmartThemeEmColor, #f3d5c0);
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
-    cursor: pointer;
+    left: 18px;
+    top: 62vh;
+    width: 52px;
+    height: 52px;
+    z-index: 10050;
+    border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.16));
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #c9a27a) 42%, #1a1a22);
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    cursor: grab;
     display: flex;
     align-items: center;
     justify-content: center;
     backdrop-filter: blur(12px);
+    touch-action: none;
 }
 
-.nsd-launcher:hover {
-    transform: translateY(-1px);
+.nsd-fab:active {
+    cursor: grabbing;
 }
 
-.nsd-launcher-mark {
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    font-size: 14px;
+.nsd-fab i {
+    font-size: 20px;
+    pointer-events: none;
 }
 
-.nsd-launcher-dot {
+.nsd-fab-dot {
     position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 8px;
-    height: 8px;
+    top: 6px;
+    right: 6px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     background: #c45c5c;
+    border: 1px solid rgba(0, 0, 0, 0.25);
 }
 
-.nsd-launcher-dot.is-ok {
+.nsd-fab-dot.is-ok {
     background: #6cbc7a;
 }
 
-.nsd-launcher-dot.is-busy {
+.nsd-fab-dot.is-busy,
+.nsd-fab.is-busy::after {
     background: #d6b25a;
-    animation: nsd-pulse 1s infinite;
 }
 
-/* ===== 悬浮窗 ===== */
-.nsd-panel {
+.nsd-fab.is-busy i {
+    opacity: 0;
+}
+
+.nsd-fab.is-busy::after {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border: 3px solid rgba(255, 255, 255, 0.28);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: nsd-spin 0.8s linear infinite;
+    background: transparent;
+}
+
+/* ===== 遮罩弹窗（点悬浮球打开，类似茶馆设置窗） ===== */
+.nsd-overlay {
     position: fixed;
-    z-index: 100002;
-    width: min(360px, calc(100vw - 24px));
-    max-height: min(78vh, 720px);
+    inset: 0;
+    z-index: 10040;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.nsd-overlay[hidden] {
+    display: none !important;
+}
+
+.nsd-modal {
+    width: min(440px, 100%);
+    max-height: min(82vh, 760px);
     display: flex;
     flex-direction: column;
     border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
     border-radius: 16px;
-    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #14141a) 92%, #000);
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #16161e) 94%, #000);
     color: var(--SmartThemeBodyColor, #eee);
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.42);
-    backdrop-filter: blur(16px);
+    box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
     overflow: hidden;
+    animation: nsd-scale-in 0.2s ease-out;
 }
 
-.nsd-panel[hidden] {
-    display: none !important;
-}
-
-.nsd-panel.is-min .nsd-panel-body {
-    display: none;
-}
-
-.nsd-panel-head {
+.nsd-modal-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    padding: 10px 12px;
-    cursor: grab;
-    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #c9a27a) 12%, transparent);
-    user-select: none;
+    padding: 12px 14px;
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #c9a27a) 14%, transparent);
 }
 
-.nsd-panel-head:active {
-    cursor: grabbing;
-}
-
-.nsd-panel-title {
+.nsd-modal-title {
     display: flex;
     align-items: center;
     gap: 10px;
     min-width: 0;
 }
 
-.nsd-panel-title small {
+.nsd-modal-title small {
     display: block;
     opacity: 0.7;
     font-size: 11px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 220px;
+    max-width: 240px;
 }
 
 .nsd-logo {
@@ -180,29 +186,56 @@
     background: color-mix(in srgb, var(--SmartThemeQuoteColor, #c9a27a) 28%, #000);
 }
 
-.nsd-panel-actions {
-    display: flex;
-    gap: 4px;
-}
-
 .nsd-icon-btn {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border: 0;
     border-radius: 8px;
     background: transparent;
     color: inherit;
     cursor: pointer;
-    opacity: 0.8;
+    font-size: 20px;
+    line-height: 1;
 }
 
 .nsd-icon-btn:hover {
     background: rgba(255, 255, 255, 0.08);
 }
 
-.nsd-panel-body {
-    padding: 12px;
+.nsd-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px 0;
+    border-bottom: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.08));
+}
+
+.nsd-tab {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    opacity: 0.55;
+    padding: 8px 6px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+}
+
+.nsd-tab.is-on {
+    opacity: 1;
+    border-bottom-color: var(--SmartThemeQuoteColor, #c9a27a);
+}
+
+.nsd-modal-body {
+    padding: 12px 14px 16px;
     overflow: auto;
+}
+
+.nsd-tab-pane {
+    display: none;
+}
+
+.nsd-tab-pane.is-on {
+    display: block;
 }
 
 .nsd-status {
@@ -217,7 +250,6 @@
     padding: 3px 8px;
     border-radius: 999px;
     border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
-    opacity: 0.9;
 }
 
 .nsd-pill-warn {
@@ -258,14 +290,15 @@
 
 .nsd-hint {
     margin: 6px 0 10px;
-    font-size: 11px;
-    opacity: 0.65;
+    font-size: 12px;
+    opacity: 0.7;
+    line-height: 1.45;
 }
 
 .nsd-id-box {
     width: 100%;
     resize: vertical;
-    min-height: 4.2em;
+    min-height: 7em;
 }
 
 .nsd-compact {
@@ -289,7 +322,7 @@
 .nsd-btn {
     border: 1px solid var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.12));
     border-radius: 10px;
-    padding: 8px 10px;
+    padding: 9px 10px;
     cursor: pointer;
     color: inherit;
     background: transparent;
@@ -337,16 +370,19 @@
     to { transform: rotate(360deg); }
 }
 
-@keyframes nsd-pulse {
-    50% { opacity: 0.35; }
+@keyframes nsd-scale-in {
+    from { transform: scale(0.94); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
 }
 
 @media (max-width: 600px) {
-    .nsd-launcher {
-        right: 12px;
-        bottom: 76px;
+    .nsd-fab {
+        left: 12px;
+        top: auto;
+        bottom: 88px;
     }
-    .nsd-panel {
-        width: calc(100vw - 16px);
+    .nsd-modal {
+        width: 100%;
+        max-height: 88vh;
     }
 }

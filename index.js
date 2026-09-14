@@ -447,10 +447,12 @@
         const bar = document.getElementById('nsd_f_progress');
         if (bar) bar.hidden = !on;
         const dot = document.getElementById('nsd_launcher_dot');
+        const fab = document.getElementById('nsd_launcher');
         if (dot) {
             dot.classList.toggle('is-busy', !!on);
             if (!on) updateFloatStatus();
         }
+        if (fab) fab.classList.toggle('is-busy', !!on);
     }
 
     async function generateNow(dry = false) {
@@ -564,10 +566,10 @@
             dot.classList.remove('is-busy');
         }
         const launcher = document.getElementById('nsd_launcher');
-        const panel = document.getElementById('nsd_panel');
+        const overlay = document.getElementById('nsd_overlay');
         if (s.showFloat === false) {
             if (launcher) launcher.style.display = 'none';
-            if (panel) panel.hidden = true;
+            if (overlay) overlay.hidden = true;
         } else if (launcher) {
             launcher.style.display = '';
         }
@@ -579,16 +581,8 @@
 
     function applyPanelPos() {
         const s = getSettings();
-        const panel = document.getElementById('nsd_panel');
-        if (!panel) return;
-        const x = s.panelX == null ? window.innerWidth - 384 : Number(s.panelX);
-        const y = s.panelY == null ? 72 : Number(s.panelY);
-        panel.style.left = `${clamp(x, 8, Math.max(8, window.innerWidth - 80))}px`;
-        panel.style.top = `${clamp(y, 8, Math.max(8, window.innerHeight - 48))}px`;
-        panel.style.right = 'auto';
-        panel.style.bottom = 'auto';
-        panel.classList.toggle('is-min', !!s.panelMin);
-        panel.hidden = !s.panelOpen;
+        const overlay = document.getElementById('nsd_overlay');
+        if (overlay) overlay.hidden = !s.panelOpen;
     }
 
     function applyLauncherPos() {
@@ -699,67 +693,83 @@
     }
 
     const FLOAT_HTML = `
-    <button id="nsd_launcher" class="nsd-launcher" type="button" title="NAI 情景生图">
-        <span class="nsd-launcher-mark">N</span>
-        <span id="nsd_launcher_dot" class="nsd-launcher-dot"></span>
+    <button id="nsd_launcher" class="nsd-fab" type="button" title="NAI 情景生图">
+        <i class="fa-solid fa-paintbrush"></i>
+        <span id="nsd_launcher_dot" class="nsd-fab-dot"></span>
     </button>
-    <aside id="nsd_panel" class="nsd-panel" hidden>
-        <header id="nsd_panel_head" class="nsd-panel-head">
-            <div class="nsd-panel-title">
-                <span class="nsd-logo">NAI</span>
-                <div>
-                    <strong>情景生图</strong>
-                    <small id="nsd_f_char">未选择角色</small>
+    <div id="nsd_overlay" class="nsd-overlay" hidden>
+        <div id="nsd_modal" class="nsd-modal" role="dialog">
+            <header class="nsd-modal-head">
+                <div class="nsd-modal-title">
+                    <span class="nsd-logo">NAI</span>
+                    <div>
+                        <strong>情景生图</strong>
+                        <small id="nsd_f_char">未选择角色</small>
+                    </div>
                 </div>
+                <button id="nsd_btn_hide" class="nsd-icon-btn" type="button" title="关闭">×</button>
+            </header>
+            <nav class="nsd-tabs">
+                <button type="button" class="nsd-tab is-on" data-nsd-tab="draw">出图</button>
+                <button type="button" class="nsd-tab" data-nsd-tab="char">角色</button>
+                <button type="button" class="nsd-tab" data-nsd-tab="setup">连接</button>
+            </nav>
+            <div class="nsd-modal-body">
+                <section class="nsd-tab-pane is-on" data-nsd-pane="draw">
+                    <div class="nsd-status">
+                        <span id="nsd_f_id_state" class="nsd-pill nsd-pill-warn">身份证未填</span>
+                        <span id="nsd_f_proxy_state" class="nsd-pill">代理</span>
+                        <span id="nsd_f_model_state" class="nsd-pill">4.5 Full</span>
+                    </div>
+                    <div class="nsd-label">本轮情景（跟正文走，不是手动开关）</div>
+                    <div id="nsd_chips" class="nsd-chips">
+                        <span data-nsd-chip="endure" class="nsd-chip">隐忍</span>
+                        <span data-nsd-chip="ahegao" class="nsd-chip">阿嘿颜</span>
+                        <span data-nsd-chip="feet" class="nsd-chip">足 / 鞋袜</span>
+                        <span data-nsd-chip="glory" class="nsd-chip">荣耀洞</span>
+                        <span data-nsd-chip="foot_hole" class="nsd-chip">脚洞</span>
+                    </div>
+                    <p id="nsd_chip_hint" class="nsd-hint">日常对话不会点亮。写到了才会加标签。</p>
+                    <div class="nsd-row nsd-compact">
+                        <label>模型
+                            <select id="nsd_f_model" class="text_pole">
+                                <option value="nai-diffusion-4-5-full">4.5 Full</option>
+                                <option value="nai-diffusion-5-full">5 Full</option>
+                                <option value="nai-diffusion-4-5-curated">4.5 Curated</option>
+                                <option value="nai-diffusion-5-curated">5 Curated</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="nsd-actions">
+                        <button id="nsd_f_preview" class="nsd-btn nsd-btn-ghost" type="button">预览</button>
+                        <button id="nsd_f_gen" class="nsd-btn nsd-btn-primary" type="button">出图</button>
+                    </div>
+                    <div id="nsd_f_progress" class="nsd-progress" hidden>
+                        <span class="nsd-spinner"></span>
+                        <span>正在向 NAI 出图…</span>
+                    </div>
+                    <details class="nsd-details">
+                        <summary>本轮提示词</summary>
+                        <pre id="nsd_f_preview_box" class="nsd-preview"></pre>
+                    </details>
+                </section>
+                <section class="nsd-tab-pane" data-nsd-pane="char">
+                    <p class="nsd-hint">身份证每张图都带，不要写表情 / 洞 / 脱鞋。</p>
+                    <div class="nsd-field">
+                        <label for="nsd_f_identity">角色身份证</label>
+                        <textarea id="nsd_f_identity" class="text_pole nsd-id-box" rows="6" placeholder="1girl, milf, huge breasts, wide hips, wedding ring, long hair, brown eyes"></textarea>
+                    </div>
+                </section>
+                <section class="nsd-tab-pane" data-nsd-pane="setup">
+                    <p class="nsd-hint">Token 只放在扩展设置里，避免聊天界面误露。这里只看连接状态。</p>
+                    <p class="nsd-hint">扩展 → NAI 情景生图（锁外貌）里填写 Token、代理、画风和负向。</p>
+                    <div class="nsd-actions">
+                        <button id="nsd_f_test" class="nsd-btn nsd-btn-ghost" type="button">测试连接</button>
+                    </div>
+                </section>
             </div>
-            <div class="nsd-panel-actions">
-                <button id="nsd_btn_min" class="nsd-icon-btn" type="button" title="收起">–</button>
-                <button id="nsd_btn_hide" class="nsd-icon-btn" type="button" title="隐藏到按钮">×</button>
-            </div>
-        </header>
-        <div id="nsd_panel_body" class="nsd-panel-body">
-            <div id="nsd_f_status" class="nsd-status">
-                <span id="nsd_f_id_state" class="nsd-pill nsd-pill-warn">身份证未填</span>
-                <span id="nsd_f_proxy_state" class="nsd-pill">代理</span>
-                <span id="nsd_f_model_state" class="nsd-pill">4.5 Full</span>
-            </div>
-            <div class="nsd-label">本轮情景（跟正文走）</div>
-            <div id="nsd_chips" class="nsd-chips">
-                <span data-nsd-chip="endure" class="nsd-chip">隐忍</span>
-                <span data-nsd-chip="ahegao" class="nsd-chip">阿嘿颜</span>
-                <span data-nsd-chip="feet" class="nsd-chip">足 / 鞋袜</span>
-                <span data-nsd-chip="glory" class="nsd-chip">荣耀洞</span>
-                <span data-nsd-chip="foot_hole" class="nsd-chip">脚洞</span>
-            </div>
-            <p id="nsd_chip_hint" class="nsd-hint">日常对话不会点亮。写到了才会加标签。</p>
-            <div class="nsd-field">
-                <label for="nsd_f_identity">角色身份证</label>
-                <textarea id="nsd_f_identity" class="text_pole nsd-id-box" rows="3" placeholder="1girl, milf, huge breasts, wide hips, wedding ring, long hair, brown eyes"></textarea>
-            </div>
-            <div class="nsd-row nsd-compact">
-                <label>模型
-                    <select id="nsd_f_model" class="text_pole">
-                        <option value="nai-diffusion-4-5-full">4.5 Full</option>
-                        <option value="nai-diffusion-5-full">5 Full</option>
-                        <option value="nai-diffusion-4-5-curated">4.5 Curated</option>
-                        <option value="nai-diffusion-5-curated">5 Curated</option>
-                    </select>
-                </label>
-            </div>
-            <div class="nsd-actions">
-                <button id="nsd_f_preview" class="nsd-btn nsd-btn-ghost" type="button">预览</button>
-                <button id="nsd_f_gen" class="nsd-btn nsd-btn-primary" type="button">出图</button>
-            </div>
-            <div id="nsd_f_progress" class="nsd-progress" hidden>
-                <span class="nsd-spinner"></span>
-                <span>正在向 NAI 出图…</span>
-            </div>
-            <details class="nsd-details">
-                <summary>本轮提示词</summary>
-                <pre id="nsd_f_preview_box" class="nsd-preview"></pre>
-            </details>
         </div>
-    </aside>`;
+    </div>`;
 
     function bindSettings() {
         bindValue('nsd_token', 'apiToken', false);
@@ -828,6 +838,15 @@
         });
     }
 
+    function switchTab(name) {
+        document.querySelectorAll('#nsd_float_root .nsd-tab').forEach(el => {
+            el.classList.toggle('is-on', el.getAttribute('data-nsd-tab') === name);
+        });
+        document.querySelectorAll('#nsd_float_root .nsd-tab-pane').forEach(el => {
+            el.classList.toggle('is-on', el.getAttribute('data-nsd-pane') === name);
+        });
+    }
+
     async function mountFloat() {
         if (document.getElementById('nsd_launcher')) return;
         const wrap = document.createElement('div');
@@ -836,12 +855,10 @@
         document.body.appendChild(wrap);
 
         const launcher = document.getElementById('nsd_launcher');
-        const panel = document.getElementById('nsd_panel');
-        const head = document.getElementById('nsd_panel_head');
+        const overlay = document.getElementById('nsd_overlay');
         applyLauncherPos();
         applyPanelPos();
         enableDrag(launcher, launcher, 'launcherX', 'launcherY');
-        enableDrag(head, panel, 'panelX', 'panelY');
 
         launcher?.addEventListener('click', (ev) => {
             if (launcher.dataset.nsdDragged === '1') {
@@ -854,11 +871,11 @@
             ev.preventDefault();
         });
         document.getElementById('nsd_btn_hide')?.addEventListener('click', hidePanel);
-        document.getElementById('nsd_btn_min')?.addEventListener('click', () => {
-            const s = getSettings();
-            s.panelMin = !s.panelMin;
-            saveSettings();
-            applyPanelPos();
+        overlay?.addEventListener('click', (ev) => {
+            if (ev.target === overlay) hidePanel();
+        });
+        document.querySelectorAll('#nsd_float_root .nsd-tab').forEach(tab => {
+            tab.addEventListener('click', () => switchTab(tab.getAttribute('data-nsd-tab')));
         });
 
         const fId = document.getElementById('nsd_f_identity');
@@ -891,7 +908,13 @@
         document.getElementById('nsd_f_gen')?.addEventListener('click', () => {
             generateNow(false).catch(e => toast('error', e.message || String(e)));
         });
+        document.getElementById('nsd_f_test')?.addEventListener('click', () => {
+            document.getElementById('nsd_btn_test')?.click();
+        });
 
+        document.addEventListener('keydown', (ev) => {
+            if (ev.key === 'Escape' && getSettings().panelOpen) hidePanel();
+        });
         window.addEventListener('resize', () => {
             applyPanelPos();
             applyLauncherPos();
